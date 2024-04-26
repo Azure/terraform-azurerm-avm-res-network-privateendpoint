@@ -49,17 +49,62 @@ resource "azurerm_resource_group" "this" {
   name     = module.naming.resource_group.name_unique
 }
 
+resource "azurerm_key_vault" "this" {
+  location                    = azurerm_resource_group.this.location
+  name                        = module.naming.key_vault.name_unique
+  resource_group_name         = azurerm_resource_group.this.location
+  sku_name                    = "standard"
+  tenant_id                   = data.azurerm_client_config.current.tenant_id
+  enabled_for_disk_encryption = true
+  purge_protection_enabled    = false
+  soft_delete_retention_days  = 7
+
+  access_policy {
+    key_permissions = [
+      "Get",
+    ]
+    object_id = data.azurerm_client_config.current.object_id
+    secret_permissions = [
+      "Get",
+    ]
+    storage_permissions = [
+      "Get",
+    ]
+    tenant_id = data.azurerm_client_config.current.tenant_id
+  }
+}
+
+resource "azurerm_virtual_network" "this" {
+  address_space       = ["10.0.0.0/16"]
+  location            = azurerm_resource_group.this.location
+  name                = module.naming.virtual_network.name_unique
+  resource_group_name = azurerm_resource_group.this.name
+}
+
+resource "azurerm_subnet" "this" {
+  address_prefixes     = ["10.0.1.0/24"]
+  name                 = module.naming.subnet.name_unique
+  resource_group_name  = azurerm_resource_group.this.name
+  virtual_network_name = azurerm_virtual_network.this.name
+}
+
+
 # This is the module call
 # Do not specify location here due to the randomization above.
 # Leaving location as `null` will cause the module to use the resource group location
 # with a data source.
 module "test" {
   source = "../../"
-  # source             = "Azure/avm-<res/ptn>-<name>/azurerm"
+  # source             = "terraform-azurerm-avm-res-network-privateendpoint/azurerm"
   # ...
-  enable_telemetry    = var.enable_telemetry # see variables.tf
-  name                = "TODO"               # TODO update with module.naming.<RESOURCE_TYPE>.name_unique
-  resource_group_name = azurerm_resource_group.this.name
+  enable_telemetry               = var.enable_telemetry # see variables.tf
+  name                           = module.naming.private_endpoint.name_unique
+  location                       = azurerm_resource_group.this.location
+  resource_group_name            = azurerm_resource_group.this.name
+  network_interface_name         = module.naming.network_interface.name_unique
+  private_connection_resource_id = azurerm_key_vault.this.id
+  subnet_resource_id             = azurerm_subnet.this.id
+  subresource_names              = ["vault"]
 }
 ```
 
@@ -86,7 +131,10 @@ The following providers are used by this module:
 
 The following resources are used by this module:
 
+- [azurerm_key_vault.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault) (resource)
 - [azurerm_resource_group.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/resource_group) (resource)
+- [azurerm_subnet.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/subnet) (resource)
+- [azurerm_virtual_network.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/virtual_network) (resource)
 - [random_integer.region_index](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/integer) (resource)
 
 <!-- markdownlint-disable MD013 -->
