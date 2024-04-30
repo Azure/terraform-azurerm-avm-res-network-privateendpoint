@@ -26,8 +26,6 @@ The following requirements are needed by this module:
 
 - <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (>= 1.5.0)
 
-- <a name="requirement_azapi"></a> [azapi](#requirement\_azapi) (>= 1.9.0, < 2.0)
-
 - <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) (~> 3.71)
 
 - <a name="requirement_random"></a> [random](#requirement\_random) (~> 3.5)
@@ -179,11 +177,11 @@ Type:
 ```hcl
 object({
     name = optional(string, null)
-    kind = optional(string, "None")
+    kind = string
   })
 ```
 
-Default: `{}`
+Default: `null`
 
 ### <a name="input_private_dns_zone_group_name"></a> [private\_dns\_zone\_group\_name](#input\_private\_dns\_zone\_group\_name)
 
@@ -248,11 +246,11 @@ Default: `null`
 
 ### <a name="input_tags"></a> [tags](#input\_tags)
 
-Description: The map of tags to be applied to the resource
+Description: Tags to be applied to the resource
 
-Type: `map(any)`
+Type: `map(string)`
 
-Default: `{}`
+Default: `null`
 
 ## Outputs
 
