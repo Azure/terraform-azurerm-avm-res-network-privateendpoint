@@ -53,7 +53,7 @@ resource "azurerm_resource_group" "this" {
 resource "azurerm_key_vault" "this" {
   location                    = azurerm_resource_group.this.location
   name                        = module.naming.key_vault.name_unique
-  resource_group_name         = azurerm_resource_group.this.location
+  resource_group_name         = azurerm_resource_group.this.name
   sku_name                    = "standard"
   tenant_id                   = data.azurerm_client_config.current.tenant_id
   enabled_for_disk_encryption = true
