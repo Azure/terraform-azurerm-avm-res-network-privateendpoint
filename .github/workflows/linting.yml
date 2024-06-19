@@ -22,7 +22,6 @@ jobs:
     steps:
       - name: checkout repository
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 #v4.1.7
-
       - name: check docs
         uses: Azure/terraform-azurerm-avm-template/.github/actions/docs-check@main
 
@@ -33,19 +32,23 @@ jobs:
     steps:
       - name: checkout repository
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 #v4.1.7
-
       - name: lint terraform
         uses: Azure/terraform-azurerm-avm-template/.github/actions/linting@main
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
   avmfix:
-    if: github.event.repository.name != 'terraform-azurerm-avm-template' && false
+    if: github.event.repository.name != 'terraform-azurerm-avm-template'
     name: avmfix
     runs-on: ubuntu-latest
     steps:
       - name: checkout repository
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 #v4.1.7
-
       - name: avmfix
         uses: Azure/terraform-azurerm-avm-template/.github/actions/avmfix@main
+
+  lintcomplete:
+    needs: [docs, terraform, avmfix]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "All linting checks passed"
