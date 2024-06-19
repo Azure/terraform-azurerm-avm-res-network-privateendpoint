@@ -1,5 +1,6 @@
 variable "location" {
   type        = string
+  nullable    = false
   description = "(Required) Azure region where the resource should be deployed.  If null, the location will be inferred from the resource group location."
 }
 
