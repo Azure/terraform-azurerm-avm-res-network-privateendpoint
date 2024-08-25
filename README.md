@@ -1,16 +1,5 @@
 <!-- BEGIN_TF_DOCS -->
-# terraform-azurerm-avm-template
-
-This is a template repo for Terraform Azure Verified Modules.
-
-Things to do:
-
-1. Set up a GitHub repo environment called `test`.
-1. Configure environment protection rule to ensure that approval is required before deploying to this environment.
-1. Create a user-assigned managed identity in your test subscription.
-1. Create a role assignment for the managed identity on your test subscription, use the minimum required role.
-1. Configure federated identity credentials on the user assigned managed identity. Use the GitHub environment.
-1. Search and update TODOs within the code and remove the TODO comments once complete.
+terraform-azurerm-avm-res-network-privateendpoint
 
 > [!IMPORTANT]
 > As the overall AVM framework is not GA (generally available) yet - the CI framework and test automation is not fully functional and implemented across all supported languages yet - breaking changes are expected, and additional customer feedback is yet to be gathered and incorporated. Hence, modules **MUST NOT** be published at version `1.0.0` or higher at this time.
@@ -114,12 +103,24 @@ Default: `true`
 
 ### <a name="input_ip_configurations"></a> [ip\_configurations](#input\_ip\_configurations)
 
-Description: (Optional) An ip\_configuration block as defined below  
-map(object({  
-  private\_ip\_address = "(Required) Specifies the static IP address within the private endpoint's subnet to be used. Changing this forces a new resource to be created."  
-  subresource\_name   = "(Required) Specifies the subresource this IP address applies to."  
-  member\_name        = "(Optional) Specifies the member name this IP address applies to."
-}))
+Description:   (Optional) An ip\_configuration block as defined below  
+  map(object({  
+    private\_ip\_address = "(Required) Specifies the static IP address within the private endpoint's subnet to be used. Changing this forces a new resource to be created."  
+    subresource\_name   = "(Required) Specifies the subresource this IP address applies to."  
+    member\_name        = "(Optional) Specifies the member name this IP address applies to."
+  }))
+
+  Example Input:
+
+  ```terraform
+  ip_configurations ={
+    "object1" = {
+      name               = "<name_of_the_ip_configuration>"
+      private_ip_address = "<value_of_the_static_IP >"
+      subresource_name   = "<subresource_name>"
+    }
+  }
+```
 
 Type:
 
@@ -187,6 +188,22 @@ Description: A map of role assignments to create on this resource. The map key i
 - `principal_type` - (Optional) The type of the `principal_id`. Possible values are `User`, `Group` and `ServicePrincipal`. It is necessary to explicitly set this attribute when creating role assignments if the principal creating the assignment is constrained by ABAC rules that filters on the PrincipalType attribute.
 
 > Note: only set `skip_service_principal_aad_check` to true if you are assigning a role to a service principal.
+
+Example Input:
+
+  ```terraform
+  role_assignments ={
+    "object1" = {
+      role_definition_id_or_name = "<role_definition_1_name>"
+      principal_id               = "<object_id_of_the_principal>"
+    },
+    "object2" = {
+      role_definition_id_or_name = "<role_definition_2_name>"
+      principal_id               = "<object_id_of_the_principal>"
+      description                = "<description>"
+    },
+  }
+```
 
 Type:
 

@@ -1,6 +1,7 @@
 variable "location" {
   type        = string
   description = "(Required) Azure region where the resource should be deployed.  If null, the location will be inferred from the resource group location."
+  nullable    = false
 }
 
 variable "name" {
@@ -52,14 +53,26 @@ variable "ip_configurations" {
     member_name        = optional(string, "default")
   }))
   default     = {}
-  description = <<-EOT
+  description = <<DESCRIPTION
   (Optional) An ip_configuration block as defined below
   map(object({
     private_ip_address = "(Required) Specifies the static IP address within the private endpoint's subnet to be used. Changing this forces a new resource to be created."
     subresource_name   = "(Required) Specifies the subresource this IP address applies to."
     member_name        = "(Optional) Specifies the member name this IP address applies to."
   }))
-  EOT
+
+  Example Input:
+
+  ```terraform
+  ip_configurations ={
+    "object1" = {
+      name               = "<name_of_the_ip_configuration>"
+      private_ip_address = "<value_of_the_static_IP >"
+      subresource_name   = "<subresource_name>"
+    }
+  }
+  ``` 
+  DESCRIPTION
 }
 
 variable "lock" {
@@ -119,6 +132,22 @@ A map of role assignments to create on this resource. The map key is deliberatel
 - `principal_type` - (Optional) The type of the `principal_id`. Possible values are `User`, `Group` and `ServicePrincipal`. It is necessary to explicitly set this attribute when creating role assignments if the principal creating the assignment is constrained by ABAC rules that filters on the PrincipalType attribute.  
 
 > Note: only set `skip_service_principal_aad_check` to true if you are assigning a role to a service principal.
+
+Example Input:
+
+  ```terraform
+  role_assignments ={
+    "object1" = {
+      role_definition_id_or_name = "<role_definition_1_name>"
+      principal_id               = "<object_id_of_the_principal>"
+    },
+    "object2" = {
+      role_definition_id_or_name = "<role_definition_2_name>"
+      principal_id               = "<object_id_of_the_principal>"
+      description                = "<description>"
+    },
+  }
+  ``` 
 DESCRIPTION
   nullable    = false
 }

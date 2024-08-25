@@ -1,9 +1,14 @@
 terraform {
-  required_version = ">= 1.5.0"
+  required_version = ">= 1.5"
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
       version = "~> 3.71"
+    }
+    # tflint-ignore: terraform_unused_required_providers
+    modtm = {
+      source  = "azure/modtm"
+      version = "~> 0.3"
     }
     random = {
       source  = "hashicorp/random"
