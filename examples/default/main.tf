@@ -1,5 +1,6 @@
 terraform {
   required_version = ">= 1.9, < 2.0"
+
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
@@ -74,10 +75,10 @@ resource "azurerm_key_vault" "this" {
 }
 
 resource "azurerm_virtual_network" "this" {
-  address_space       = ["10.0.0.0/16"]
   location            = azurerm_resource_group.this.location
   name                = module.naming.virtual_network.name_unique
   resource_group_name = azurerm_resource_group.this.name
+  address_space       = ["10.0.0.0/16"]
 }
 
 resource "azurerm_subnet" "this" {
@@ -94,14 +95,15 @@ resource "azurerm_subnet" "this" {
 # with a data source.
 module "test" {
   source = "../../"
-  # source             = "terraform-azurerm-avm-res-network-privateendpoint/azurerm"
-  # ...
-  enable_telemetry               = var.enable_telemetry # see variables.tf
-  name                           = module.naming.private_endpoint.name_unique
+
   location                       = azurerm_resource_group.this.location
-  resource_group_name            = azurerm_resource_group.this.name
+  name                           = module.naming.private_endpoint.name_unique
   network_interface_name         = module.naming.network_interface.name_unique
   private_connection_resource_id = azurerm_key_vault.this.id
+  resource_group_name            = azurerm_resource_group.this.name
   subnet_resource_id             = azurerm_subnet.this.id
-  subresource_names              = ["vault"]
+  # source             = "terraform-azurerm-avm-res-network-privateendpoint/azurerm"
+  # ...
+  enable_telemetry  = var.enable_telemetry # see variables.tf
+  subresource_names = ["vault"]
 }
