@@ -12,6 +12,7 @@ resource "azurerm_private_endpoint" "this" {
     private_connection_resource_id = var.private_connection_resource_id
     subresource_names              = var.subresource_names
   }
+
   dynamic "ip_configuration" {
     for_each = var.ip_configurations
 
@@ -22,6 +23,7 @@ resource "azurerm_private_endpoint" "this" {
       subresource_name   = ip_configuration.value.subresource_name
     }
   }
+
   dynamic "private_dns_zone_group" {
     for_each = length(var.private_dns_zone_resource_ids) > 0 ? ["this"] : []
 
