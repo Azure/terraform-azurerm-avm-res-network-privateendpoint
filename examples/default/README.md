@@ -42,6 +42,7 @@ resource "random_integer" "region_index" {
   max = length(module.regions.regions) - 1
   min = 0
 }
+
 ## End of section to provide a random Azure region for the resource group
 
 # This ensures we have unique CAF compliant names for our resources.
@@ -57,14 +58,11 @@ resource "azurerm_resource_group" "this" {
 }
 
 resource "azurerm_key_vault" "this" {
-  location                    = azurerm_resource_group.this.location
-  name                        = module.naming.key_vault.name_unique
-  resource_group_name         = azurerm_resource_group.this.name
-  sku_name                    = "standard"
-  tenant_id                   = data.azurerm_client_config.current.tenant_id
-  enabled_for_disk_encryption = true
-  purge_protection_enabled    = false
-  soft_delete_retention_days  = 7
+  location            = azurerm_resource_group.this.location
+  name                = module.naming.key_vault.name_unique
+  resource_group_name = azurerm_resource_group.this.name
+  sku_name            = "standard"
+  tenant_id           = data.azurerm_client_config.current.tenant_id
 
   access_policy {
     key_permissions = [
@@ -79,6 +77,9 @@ resource "azurerm_key_vault" "this" {
     ]
     tenant_id = data.azurerm_client_config.current.tenant_id
   }
+  enabled_for_disk_encryption = true
+  purge_protection_enabled    = false
+  soft_delete_retention_days  = 7
 }
 
 resource "azurerm_virtual_network" "this" {
@@ -89,12 +90,11 @@ resource "azurerm_virtual_network" "this" {
 }
 
 resource "azurerm_subnet" "this" {
-  address_prefixes     = ["10.0.1.0/24"]
   name                 = module.naming.subnet.name_unique
   resource_group_name  = azurerm_resource_group.this.name
   virtual_network_name = azurerm_virtual_network.this.name
+  address_prefixes     = ["10.0.1.0/24"]
 }
-
 
 # This is the module call
 # Do not specify location here due to the randomization above.
