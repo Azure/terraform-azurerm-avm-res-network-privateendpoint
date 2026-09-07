@@ -54,12 +54,6 @@ Description: (Required) The name of the this resource.
 
 Type: `string`
 
-### <a name="input_network_interface_name"></a> [network\_interface\_name](#input\_network\_interface\_name)
-
-Description: (Optional) The custom name of the network interface attached to the private endpoint. Changing this forces a new resource to be created
-
-Type: `string`
-
 ### <a name="input_private_connection_resource_id"></a> [private\_connection\_resource\_id](#input\_private\_connection\_resource\_id)
 
 Description: (Required) The ID of the Private Link Enabled Remote Resource which this Private Endpoint should be connected to.
@@ -146,6 +140,14 @@ object({
     kind = string
   })
 ```
+
+Default: `null`
+
+### <a name="input_network_interface_name"></a> [network\_interface\_name](#input\_network\_interface\_name)
+
+Description: (Optional) The custom name of the network interface attached to the private endpoint. Changing this forces a new resource to be created
+
+Type: `string`
 
 Default: `null`
 
