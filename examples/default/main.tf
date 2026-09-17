@@ -104,6 +104,6 @@ module "test" {
   subnet_resource_id             = azurerm_subnet.this.id
   # source             = "terraform-azurerm-avm-res-network-privateendpoint/azurerm"
   # ...
-  enable_telemetry  = var.enable_telemetry # see variables.tf
+  enable_telemetry  = false # see variables.tf
   subresource_names = ["vault"]
 }
