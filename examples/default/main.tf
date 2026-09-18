@@ -98,7 +98,7 @@ module "test" {
 
   location                       = azurerm_resource_group.this.location
   name                           = module.naming.private_endpoint.name_unique
-  network_interface_name         = module.naming.network_interface.name_unique
+  # network_interface_name         = module.naming.network_interface.name_unique  # Optional: Uncomment to set a custom network interface name
   private_connection_resource_id = azurerm_key_vault.this.id
   resource_group_name            = azurerm_resource_group.this.name
   subnet_resource_id             = azurerm_subnet.this.id

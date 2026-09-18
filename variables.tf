@@ -11,7 +11,9 @@ variable "name" {
 
 variable "network_interface_name" {
   type        = string
+  default     = null
   description = "(Optional) The custom name of the network interface attached to the private endpoint. Changing this forces a new resource to be created"
+  nullable    = true
 }
 
 variable "private_connection_resource_id" {
