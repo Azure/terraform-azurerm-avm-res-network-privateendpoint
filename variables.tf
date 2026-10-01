@@ -14,14 +14,19 @@ variable "network_interface_name" {
   description = "(Optional) The custom name of the network interface attached to the private endpoint. Changing this forces a new resource to be created"
 }
 
+variable "parent_id" {
+  type        = string
+  description = "The Azure resource ID of the parent resource group, in the form `/subscriptions/{subscription_id}/resourceGroups/{resource_group_name}`."
+
+  validation {
+    condition     = can(provider::azapi::parse_resource_id("Microsoft.Resources/resourceGroups", var.parent_id))
+    error_message = "The parent_id must be a valid Azure resource group resource ID."
+  }
+}
+
 variable "private_connection_resource_id" {
   type        = string
   description = "(Required) The ID of the Private Link Enabled Remote Resource which this Private Endpoint should be connected to."
-}
-
-variable "resource_group_name" {
-  type        = string
-  description = "(Required) The resource group where the resources will be deployed."
 }
 
 variable "subnet_resource_id" {
@@ -43,6 +48,15 @@ This variable controls whether or not telemetry is enabled for the module.
 For more information see <https://aka.ms/avm/telemetryinfo>.
 If it is set to false, then no telemetry will be collected.
 DESCRIPTION
+  nullable    = false
+}
+
+variable "ignore_body_changes" {
+  type = object({
+    private_endpoint = optional(list(string), [])
+  })
+  default     = {}
+  description = "A map of AzAPI body paths to ignore for each resource."
   nullable    = false
 }
 
@@ -108,6 +122,37 @@ variable "private_service_connection_name" {
   description = "(Optional) Specifies the  Specifies the Name of the Private Service Connection."
 }
 
+variable "resource_types" {
+  type = object({
+    application_security_group_association = optional(string, "Microsoft.Network/privateEndpoints/applicationSecurityGroupAssociations@2024-05-01")
+    private_dns_zone_group                 = optional(string, "Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01")
+    private_endpoint                       = optional(string, "Microsoft.Network/privateEndpoints@2024-05-01")
+  })
+  default     = {}
+  description = "The Azure resource type API versions used by this module."
+  nullable    = false
+}
+
+variable "retry" {
+  type = object({
+    error_message_regex  = optional(list(string), ["ReferencedResourceNotProvisioned", "CannotDeleteResource"])
+    interval_seconds     = optional(number, 10)
+    max_interval_seconds = optional(number, 180)
+    multiplier           = optional(number, 1.5)
+    randomization_factor = optional(number, 0.5)
+  })
+  default     = {}
+  description = "Retry configuration for AzAPI resource operations."
+  nullable    = false
+}
+
+variable "role_assignment_name_use_random_uuid" {
+  type        = bool
+  default     = true
+  description = "Use a random UUID for role assignment names to avoid duplicate deterministic IDs across scopes."
+  nullable    = false
+}
+
 variable "role_assignments" {
   type = map(object({
     role_definition_id_or_name             = string
@@ -163,4 +208,30 @@ variable "tags" {
   type        = map(string)
   default     = null
   description = "Tags to be applied to the resource"
+}
+
+variable "timeouts" {
+  type = object({
+    application_security_group_association = optional(object({
+      create = optional(string, "30m")
+      delete = optional(string, "30m")
+      read   = optional(string, "5m")
+      update = optional(string, "30m")
+    }), {})
+    private_dns_zone_group = optional(object({
+      create = optional(string, "30m")
+      delete = optional(string, "30m")
+      read   = optional(string, "5m")
+      update = optional(string, "30m")
+    }), {})
+    private_endpoint = optional(object({
+      create = optional(string, "30m")
+      delete = optional(string, "30m")
+      read   = optional(string, "5m")
+      update = optional(string, "30m")
+    }), {})
+  })
+  default     = {}
+  description = "Timeout configuration for resources created by this module."
+  nullable    = false
 }

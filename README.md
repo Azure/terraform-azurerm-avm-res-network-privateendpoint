@@ -18,22 +18,24 @@ The following requirements are needed by this module:
 
 - <a name="requirement_azapi"></a> [azapi](#requirement\_azapi) (~> 2.12)
 
-- <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) (>= 3.71, < 5.0)
-
 - <a name="requirement_modtm"></a> [modtm](#requirement\_modtm) (~> 0.3)
 
 - <a name="requirement_random"></a> [random](#requirement\_random) (~> 3.5)
+
+- <a name="requirement_time"></a> [time](#requirement\_time) (~> 0.13)
 
 ## Resources
 
 The following resources are used by this module:
 
-- [azurerm_management_lock.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/management_lock) (resource)
-- [azurerm_private_endpoint.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/private_endpoint) (resource)
-- [azurerm_private_endpoint_application_security_group_association.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/private_endpoint_application_security_group_association) (resource)
-- [azurerm_role_assignment.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) (resource)
+- [azapi_resource.application_security_group_associations](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
+- [azapi_resource.lock](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
+- [azapi_resource.private_dns_zone_group](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
+- [azapi_resource.role_assignments](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
+- [azapi_resource.this](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
 - [modtm_telemetry.telemetry](https://registry.terraform.io/providers/azure/modtm/latest/docs/resources/telemetry) (resource)
 - [random_uuid.telemetry](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/uuid) (resource)
+- [time_sleep.wait_for_resource_destroy](https://registry.terraform.io/providers/hashicorp/time/latest/docs/resources/sleep) (resource)
 - [azapi_client_config.telemetry](https://registry.terraform.io/providers/Azure/azapi/latest/docs/data-sources/client_config) (data source)
 - [modtm_module_source.telemetry](https://registry.terraform.io/providers/azure/modtm/latest/docs/data-sources/module_source) (data source)
 
@@ -60,15 +62,15 @@ Description: (Optional) The custom name of the network interface attached to the
 
 Type: `string`
 
-### <a name="input_private_connection_resource_id"></a> [private\_connection\_resource\_id](#input\_private\_connection\_resource\_id)
+### <a name="input_parent_id"></a> [parent\_id](#input\_parent\_id)
 
-Description: (Required) The ID of the Private Link Enabled Remote Resource which this Private Endpoint should be connected to.
+Description: The Azure resource ID of the parent resource group, in the form `/subscriptions/{subscription_id}/resourceGroups/{resource_group_name}`.
 
 Type: `string`
 
-### <a name="input_resource_group_name"></a> [resource\_group\_name](#input\_resource\_group\_name)
+### <a name="input_private_connection_resource_id"></a> [private\_connection\_resource\_id](#input\_private\_connection\_resource\_id)
 
-Description: (Required) The resource group where the resources will be deployed.
+Description: (Required) The ID of the Private Link Enabled Remote Resource which this Private Endpoint should be connected to.
 
 Type: `string`
 
@@ -99,6 +101,20 @@ If it is set to false, then no telemetry will be collected.
 Type: `bool`
 
 Default: `true`
+
+### <a name="input_ignore_body_changes"></a> [ignore\_body\_changes](#input\_ignore\_body\_changes)
+
+Description: A map of AzAPI body paths to ignore for each resource.
+
+Type:
+
+```hcl
+object({
+    private_endpoint = optional(list(string), [])
+  })
+```
+
+Default: `{}`
 
 ### <a name="input_ip_configurations"></a> [ip\_configurations](#input\_ip\_configurations)
 
@@ -173,6 +189,48 @@ Type: `string`
 
 Default: `null`
 
+### <a name="input_resource_types"></a> [resource\_types](#input\_resource\_types)
+
+Description: The Azure resource type API versions used by this module.
+
+Type:
+
+```hcl
+object({
+    application_security_group_association = optional(string, "Microsoft.Network/privateEndpoints/applicationSecurityGroupAssociations@2024-05-01")
+    private_dns_zone_group                 = optional(string, "Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01")
+    private_endpoint                       = optional(string, "Microsoft.Network/privateEndpoints@2024-05-01")
+  })
+```
+
+Default: `{}`
+
+### <a name="input_retry"></a> [retry](#input\_retry)
+
+Description: Retry configuration for AzAPI resource operations.
+
+Type:
+
+```hcl
+object({
+    error_message_regex  = optional(list(string), ["ReferencedResourceNotProvisioned", "CannotDeleteResource"])
+    interval_seconds     = optional(number, 10)
+    max_interval_seconds = optional(number, 180)
+    multiplier           = optional(number, 1.5)
+    randomization_factor = optional(number, 0.5)
+  })
+```
+
+Default: `{}`
+
+### <a name="input_role_assignment_name_use_random_uuid"></a> [role\_assignment\_name\_use\_random\_uuid](#input\_role\_assignment\_name\_use\_random\_uuid)
+
+Description: Use a random UUID for role assignment names to avoid duplicate deterministic IDs across scopes.
+
+Type: `bool`
+
+Default: `true`
+
 ### <a name="input_role_assignments"></a> [role\_assignments](#input\_role\_assignments)
 
 Description: A map of role assignments to create on this resource. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
@@ -237,6 +295,37 @@ Type: `map(string)`
 
 Default: `null`
 
+### <a name="input_timeouts"></a> [timeouts](#input\_timeouts)
+
+Description: Timeout configuration for resources created by this module.
+
+Type:
+
+```hcl
+object({
+    application_security_group_association = optional(object({
+      create = optional(string, "30m")
+      delete = optional(string, "30m")
+      read   = optional(string, "5m")
+      update = optional(string, "30m")
+    }), {})
+    private_dns_zone_group = optional(object({
+      create = optional(string, "30m")
+      delete = optional(string, "30m")
+      read   = optional(string, "5m")
+      update = optional(string, "30m")
+    }), {})
+    private_endpoint = optional(object({
+      create = optional(string, "30m")
+      delete = optional(string, "30m")
+      read   = optional(string, "5m")
+      update = optional(string, "30m")
+    }), {})
+  })
+```
+
+Default: `{}`
+
 ## Outputs
 
 The following outputs are exported:
@@ -255,7 +344,13 @@ Description: ID of the resource.
 
 ## Modules
 
-No modules.
+The following Modules are called:
+
+### <a name="module_avm_interfaces"></a> [avm\_interfaces](#module\_avm\_interfaces)
+
+Source: Azure/avm-utl-interfaces/azure
+
+Version: 0.5.0
 
 <!-- markdownlint-disable-next-line MD041 -->
 ## Data Collection
