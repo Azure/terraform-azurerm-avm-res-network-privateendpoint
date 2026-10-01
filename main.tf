@@ -1,64 +1,179 @@
-resource "azurerm_private_endpoint" "this" {
-  location                      = var.location
-  name                          = var.name
-  resource_group_name           = var.resource_group_name
-  subnet_id                     = var.subnet_resource_id
-  custom_network_interface_name = var.network_interface_name
-  tags                          = var.tags
-
-  private_service_connection {
-    is_manual_connection           = false
-    name                           = var.private_service_connection_name != null ? var.private_service_connection_name : "pse-${var.name}"
-    private_connection_resource_id = var.private_connection_resource_id
-    subresource_names              = var.subresource_names
-  }
-
-  dynamic "ip_configuration" {
-    for_each = var.ip_configurations
-
-    content {
-      name               = ip_configuration.value.name
-      private_ip_address = ip_configuration.value.private_ip_address
-      member_name        = ip_configuration.value.member_name
-      subresource_name   = ip_configuration.value.subresource_name
+resource "azapi_resource" "this" {
+  location  = var.location
+  name      = var.name
+  parent_id = var.parent_id
+  type      = var.resource_types.private_endpoint
+  body = {
+    properties = {
+      customNetworkInterfaceName = var.network_interface_name
+      ipConfigurations = [
+        for ip_configuration in values(var.ip_configurations) : {
+          name = ip_configuration.name
+          properties = {
+            groupId          = ip_configuration.subresource_name
+            memberName       = ip_configuration.member_name
+            privateIPAddress = ip_configuration.private_ip_address
+          }
+        }
+      ]
+      privateLinkServiceConnections = [
+        {
+          name = var.private_service_connection_name != null ? var.private_service_connection_name : "pse-${var.name}"
+          properties = {
+            groupIds             = var.subresource_names
+            privateLinkServiceId = var.private_connection_resource_id
+          }
+        }
+      ]
+      subnet = {
+        id = var.subnet_resource_id
+      }
     }
   }
+  create_headers      = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+  delete_headers      = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+  ignore_body_changes = length(var.ignore_body_changes.private_endpoint) > 0 ? var.ignore_body_changes.private_endpoint : null
+  read_headers        = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+  response_export_values = {
+    id         = "id"
+    name       = "name"
+    properties = "properties"
+    type       = "type"
+  }
+  retry          = var.retry
+  tags           = var.tags
+  update_headers = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
 
-  dynamic "private_dns_zone_group" {
-    for_each = length(var.private_dns_zone_resource_ids) > 0 ? ["this"] : []
-
-    content {
-      name                 = var.private_dns_zone_group_name
-      private_dns_zone_ids = var.private_dns_zone_resource_ids
-    }
+  timeouts {
+    create = var.timeouts.private_endpoint.create
+    delete = var.timeouts.private_endpoint.delete
+    read   = var.timeouts.private_endpoint.read
+    update = var.timeouts.private_endpoint.update
   }
 }
 
-resource "azurerm_private_endpoint_application_security_group_association" "this" {
+resource "azapi_resource" "private_dns_zone_group" {
+  count = length(var.private_dns_zone_resource_ids) > 0 ? 1 : 0
+
+  name      = var.private_dns_zone_group_name
+  parent_id = azapi_resource.this.id
+  type      = var.resource_types.private_dns_zone_group
+  body = {
+    properties = {
+      privateDnsZoneConfigs = [
+        for private_dns_zone_resource_id in var.private_dns_zone_resource_ids : {
+          name = element(reverse(split("/", private_dns_zone_resource_id)), 0)
+          properties = {
+            privateDnsZoneId = private_dns_zone_resource_id
+          }
+        }
+      ]
+    }
+  }
+  create_headers = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+  delete_headers = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+  read_headers   = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+  response_export_values = {
+    id         = "id"
+    name       = "name"
+    properties = "properties"
+    type       = "type"
+  }
+  retry          = var.retry
+  update_headers = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+
+  timeouts {
+    create = var.timeouts.private_dns_zone_group.create
+    delete = var.timeouts.private_dns_zone_group.delete
+    read   = var.timeouts.private_dns_zone_group.read
+    update = var.timeouts.private_dns_zone_group.update
+  }
+}
+
+resource "azapi_resource" "application_security_group_associations" {
   for_each = var.application_security_group_association_ids
 
-  application_security_group_id = each.value
-  private_endpoint_id           = azurerm_private_endpoint.this.id
+  name      = element(reverse(split("/", each.value)), 0)
+  parent_id = azapi_resource.this.id
+  type      = var.resource_types.application_security_group_association
+  body = {
+    properties = {
+      applicationSecurityGroup = {
+        id = each.value
+      }
+    }
+  }
+  create_headers = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+  delete_headers = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+  read_headers   = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+  response_export_values = {
+    id         = "id"
+    name       = "name"
+    properties = "properties"
+    type       = "type"
+  }
+  retry          = var.retry
+  update_headers = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+
+  timeouts {
+    create = var.timeouts.application_security_group_association.create
+    delete = var.timeouts.application_security_group_association.delete
+    read   = var.timeouts.application_security_group_association.read
+    update = var.timeouts.application_security_group_association.update
+  }
 }
 
-resource "azurerm_management_lock" "this" {
+module "avm_interfaces" {
+  source  = "Azure/avm-utl-interfaces/azure"
+  version = "0.5.0"
+
+  enable_telemetry                          = var.enable_telemetry
+  lock                                      = var.lock
+  role_assignment_definition_lookup_enabled = true
+  role_assignment_definition_scope          = azapi_resource.this.id
+  role_assignment_name_use_random_uuid      = var.role_assignment_name_use_random_uuid
+  role_assignments                          = var.role_assignments
+}
+
+resource "azapi_resource" "role_assignments" {
+  for_each = module.avm_interfaces.role_assignments_azapi
+
+  name           = each.value.name
+  parent_id      = azapi_resource.this.id
+  type           = each.value.type
+  body           = each.value.body
+  create_headers = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+  delete_headers = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+  read_headers   = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+  response_export_values = {
+    id               = "id"
+    name             = "name"
+    principalId      = "properties.principalId"
+    principalType    = "properties.principalType"
+    roleDefinitionId = "properties.roleDefinitionId"
+    scope            = "properties.scope"
+    type             = "type"
+  }
+  update_headers = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+}
+
+resource "azapi_resource" "lock" {
   count = var.lock != null ? 1 : 0
 
-  lock_level = var.lock.kind
-  name       = coalesce(var.lock.name, "lock-${var.lock.kind}")
-  scope      = azurerm_private_endpoint.this.id
-  notes      = var.lock.kind == "CanNotDelete" ? "Cannot delete the resource or its child resources." : "Cannot delete or modify the resource or its child resources."
+  name           = module.avm_interfaces.lock_azapi.name != null ? module.avm_interfaces.lock_azapi.name : "lock-${azapi_resource.this.name}"
+  parent_id      = azapi_resource.this.id
+  type           = module.avm_interfaces.lock_azapi.type
+  body           = module.avm_interfaces.lock_azapi.body
+  create_headers = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+  delete_headers = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+  read_headers   = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+  update_headers = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+
+  depends_on = [time_sleep.wait_for_resource_destroy]
 }
 
-resource "azurerm_role_assignment" "this" {
-  for_each = var.role_assignments
+resource "time_sleep" "wait_for_resource_destroy" {
+  destroy_duration = "20s"
 
-  principal_id                           = each.value.principal_id
-  scope                                  = azurerm_private_endpoint.this.id
-  condition                              = each.value.condition
-  condition_version                      = each.value.condition_version
-  delegated_managed_identity_resource_id = each.value.delegated_managed_identity_resource_id
-  role_definition_id                     = strcontains(lower(each.value.role_definition_id_or_name), lower(local.role_definition_resource_substring)) ? each.value.role_definition_id_or_name : null
-  role_definition_name                   = strcontains(lower(each.value.role_definition_id_or_name), lower(local.role_definition_resource_substring)) ? null : each.value.role_definition_id_or_name
-  skip_service_principal_aad_check       = each.value.skip_service_principal_aad_check
+  depends_on = [azapi_resource.this]
 }
