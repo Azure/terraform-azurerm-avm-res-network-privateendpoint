@@ -11,27 +11,24 @@ terraform-azurerm-avm-res-network-privateendpoint
 
 ## Upgrading from a version that used the AzureRM provider
 
-This version manages the private endpoint with AzAPI and includes migration blocks for the private endpoint, role assignments, application security group associations, and locks. Run `terraform init -upgrade`, then `terraform plan`. Expect in-place updates while AzAPI takes over existing resources and new `random_uuid` resources when role assignments are configured. Do not apply a plan that destroys or replaces the private endpoint, lock, or role assignments.
+This version manages the private endpoint with AzAPI and includes migration blocks for the private endpoint, role assignments, application security group associations, private DNS zone groups, and locks. Terraform 1.16 or later is required because the module uses opt-in managed import blocks for AzureRM inline resources that now have AzAPI child-resource addresses.
 
-Two cases need extra steps:
+Run `terraform init -upgrade`, set `avm_managed_migration_enabled = true`, then run `terraform plan`. Expect in-place updates while AzAPI takes over existing resources and new `random_uuid` resources when role assignments are configured. Do not apply a plan that destroys or replaces the private endpoint, lock, role assignments, or private DNS zone group.
 
-- **Private DNS zone groups.** The private DNS zone group is now managed by a submodule because it is a child resource of the private endpoint. If you set `private_dns_zone_resource_ids`, import the existing DNS zone group at its new address before applying:
+The private DNS zone group is now managed by a submodule because it is a child resource of the private endpoint. If you set `private_dns_zone_resource_ids`, `avm_managed_migration_enabled = true` causes the module to import the existing DNS zone group into `module.private_dns_zone_group[0].azapi_resource.this` during the migration apply. The import ID is built from the private endpoint ID and `private_dns_zone_group_name`; when `private_dns_zone_group_name` is not set, the module uses `default`.
 
-  ```hcl
-  import {
-    to = module.<module-name>.module.private_dns_zone_group[0].azapi_resource.this
-    id = "<private endpoint resource ID>/privateDnsZoneGroups/<private DNS zone group name>"
-  }
-  ```
+After one successful migration apply and a clean follow-up plan, set `avm_managed_migration_enabled = false` again.
 
-- **`ReadOnly` lock.** The upgrade updates the private endpoint in place, which a `ReadOnly` lock blocks. Before upgrading, apply your configuration with `lock = null` using the old version, then upgrade and restore the lock.
+One case still needs an extra step:
+
+- **`ReadOnly` lock.** The upgrade updates the private endpoint in place, which a `ReadOnly` lock blocks. Before upgrading, apply your configuration with `lock = null` using the old version, then upgrade and restore the lock after the migration.
 
 <!-- markdownlint-disable MD033 -->
 ## Requirements
 
 The following requirements are needed by this module:
 
-- <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (>= 1.9, < 2.0)
+- <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (>= 1.16, < 2.0)
 
 - <a name="requirement_azapi"></a> [azapi](#requirement\_azapi) (~> 2.12)
 
@@ -106,6 +103,14 @@ Description: (Optional) The resource ids of application security group to associ
 Type: `set(string)`
 
 Default: `[]`
+
+### <a name="input_avm_managed_migration_enabled"></a> [avm\_managed\_migration\_enabled](#input\_avm\_managed\_migration\_enabled)
+
+Description: Enables module-owned migration helpers for upgrading from earlier AzureRM-backed versions. Set to true only during the upgrade apply, then set back to false.
+
+Type: `bool`
+
+Default: `false`
 
 ### <a name="input_enable_telemetry"></a> [enable\_telemetry](#input\_enable\_telemetry)
 

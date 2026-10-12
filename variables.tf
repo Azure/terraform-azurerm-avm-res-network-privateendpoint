@@ -40,6 +40,13 @@ variable "application_security_group_association_ids" {
   description = "(Optional) The resource ids of application security group to associate."
 }
 
+variable "avm_managed_migration_enabled" {
+  type        = bool
+  default     = false
+  description = "Enables module-owned migration helpers for upgrading from earlier AzureRM-backed versions. Set to true only during the upgrade apply, then set back to false."
+  nullable    = false
+}
+
 variable "enable_telemetry" {
   type        = bool
   default     = true

@@ -65,13 +65,20 @@ module "private_dns_zone_group" {
   source = "./modules/private-dns-zone-group"
   count  = length(var.private_dns_zone_resource_ids) > 0 ? 1 : 0
 
-  name                          = var.private_dns_zone_group_name
+  name                          = local.private_dns_zone_group_name
   private_dns_zone_resource_ids = var.private_dns_zone_resource_ids
   private_endpoint_id           = azapi_resource.this.id
   resource_type                 = var.resource_types.private_dns_zone_group
   headers                       = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
   retry                         = var.retry
   timeouts                      = var.timeouts.private_dns_zone_group
+}
+
+import {
+  for_each = local.private_dns_zone_group_imports
+
+  to = module.private_dns_zone_group[0].azapi_resource.this
+  id = each.value
 }
 
 module "avm_interfaces" {
