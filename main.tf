@@ -140,7 +140,13 @@ resource "azapi_resource" "lock" {
 }
 
 resource "time_sleep" "wait_for_resource_destroy" {
-  destroy_duration = "20s"
+  count = var.lock != null ? 1 : 0
 
-  depends_on = [azapi_resource.this]
+  destroy_duration = "30s"
+
+  depends_on = [
+    azapi_resource.this,
+    azapi_resource.role_assignments,
+    module.private_dns_zone_group,
+  ]
 }
