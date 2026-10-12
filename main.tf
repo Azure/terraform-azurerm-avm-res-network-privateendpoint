@@ -5,6 +5,7 @@ resource "azapi_resource" "this" {
   type      = var.resource_types.private_endpoint
   body = {
     properties = {
+      applicationSecurityGroups  = [for id in var.application_security_group_association_ids : { id = id }]
       customNetworkInterfaceName = var.network_interface_name
       ipConfigurations = [
         for ip_configuration in values(var.ip_configurations) : {
@@ -34,6 +35,14 @@ resource "azapi_resource" "this" {
   delete_headers      = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
   ignore_body_changes = length(var.ignore_body_changes.private_endpoint) > 0 ? var.ignore_body_changes.private_endpoint : null
   read_headers        = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+  replace_triggers_external_values = {
+    ip_configurations               = var.ip_configurations
+    network_interface_name          = var.network_interface_name
+    private_connection_resource_id  = var.private_connection_resource_id
+    private_service_connection_name = var.private_service_connection_name
+    subnet_resource_id              = var.subnet_resource_id
+    subresource_names               = var.subresource_names
+  }
   response_export_values = {
     id         = "id"
     name       = "name"
@@ -52,75 +61,17 @@ resource "azapi_resource" "this" {
   }
 }
 
-resource "azapi_resource" "private_dns_zone_group" {
-  count = length(var.private_dns_zone_resource_ids) > 0 ? 1 : 0
+module "private_dns_zone_group" {
+  source = "./modules/private-dns-zone-group"
+  count  = length(var.private_dns_zone_resource_ids) > 0 ? 1 : 0
 
-  name      = var.private_dns_zone_group_name
-  parent_id = azapi_resource.this.id
-  type      = var.resource_types.private_dns_zone_group
-  body = {
-    properties = {
-      privateDnsZoneConfigs = [
-        for private_dns_zone_resource_id in var.private_dns_zone_resource_ids : {
-          name = element(reverse(split("/", private_dns_zone_resource_id)), 0)
-          properties = {
-            privateDnsZoneId = private_dns_zone_resource_id
-          }
-        }
-      ]
-    }
-  }
-  create_headers = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
-  delete_headers = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
-  read_headers   = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
-  response_export_values = {
-    id         = "id"
-    name       = "name"
-    properties = "properties"
-    type       = "type"
-  }
-  retry          = var.retry
-  update_headers = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
-
-  timeouts {
-    create = var.timeouts.private_dns_zone_group.create
-    delete = var.timeouts.private_dns_zone_group.delete
-    read   = var.timeouts.private_dns_zone_group.read
-    update = var.timeouts.private_dns_zone_group.update
-  }
-}
-
-resource "azapi_resource" "application_security_group_associations" {
-  for_each = var.application_security_group_association_ids
-
-  name      = element(reverse(split("/", each.value)), 0)
-  parent_id = azapi_resource.this.id
-  type      = var.resource_types.application_security_group_association
-  body = {
-    properties = {
-      applicationSecurityGroup = {
-        id = each.value
-      }
-    }
-  }
-  create_headers = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
-  delete_headers = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
-  read_headers   = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
-  response_export_values = {
-    id         = "id"
-    name       = "name"
-    properties = "properties"
-    type       = "type"
-  }
-  retry          = var.retry
-  update_headers = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
-
-  timeouts {
-    create = var.timeouts.application_security_group_association.create
-    delete = var.timeouts.application_security_group_association.delete
-    read   = var.timeouts.application_security_group_association.read
-    update = var.timeouts.application_security_group_association.update
-  }
+  name                          = var.private_dns_zone_group_name
+  private_dns_zone_resource_ids = var.private_dns_zone_resource_ids
+  private_endpoint_id           = azapi_resource.this.id
+  resource_type                 = var.resource_types.private_dns_zone_group
+  headers                       = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+  retry                         = var.retry
+  timeouts                      = var.timeouts.private_dns_zone_group
 }
 
 module "avm_interfaces" {
@@ -155,15 +106,24 @@ resource "azapi_resource" "role_assignments" {
     type             = "type"
   }
   update_headers = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+
+  lifecycle {
+    ignore_changes = [name]
+  }
 }
 
 resource "azapi_resource" "lock" {
   count = var.lock != null ? 1 : 0
 
-  name           = module.avm_interfaces.lock_azapi.name != null ? module.avm_interfaces.lock_azapi.name : "lock-${azapi_resource.this.name}"
-  parent_id      = azapi_resource.this.id
-  type           = module.avm_interfaces.lock_azapi.type
-  body           = module.avm_interfaces.lock_azapi.body
+  name      = coalesce(var.lock.name, "lock-${var.lock.kind}")
+  parent_id = azapi_resource.this.id
+  type      = module.avm_interfaces.lock_azapi.type
+  body = {
+    properties = {
+      level = var.lock.kind
+      notes = lookup(local.lock_notes, var.lock.kind, null)
+    }
+  }
   create_headers = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
   delete_headers = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
   read_headers   = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null

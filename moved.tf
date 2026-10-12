@@ -3,9 +3,12 @@ moved {
   to   = azapi_resource.this
 }
 
-moved {
+removed {
   from = azurerm_private_endpoint_application_security_group_association.this
-  to   = azapi_resource.application_security_group_associations
+
+  lifecycle {
+    destroy = false
+  }
 }
 
 moved {

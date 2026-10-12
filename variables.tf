@@ -124,9 +124,8 @@ variable "private_service_connection_name" {
 
 variable "resource_types" {
   type = object({
-    application_security_group_association = optional(string, "Microsoft.Network/privateEndpoints/applicationSecurityGroupAssociations@2024-05-01")
-    private_dns_zone_group                 = optional(string, "Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01")
-    private_endpoint                       = optional(string, "Microsoft.Network/privateEndpoints@2024-05-01")
+    private_dns_zone_group = optional(string, "Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01")
+    private_endpoint       = optional(string, "Microsoft.Network/privateEndpoints@2024-05-01")
   })
   default     = {}
   description = "The Azure resource type API versions used by this module."
@@ -212,12 +211,6 @@ variable "tags" {
 
 variable "timeouts" {
   type = object({
-    application_security_group_association = optional(object({
-      create = optional(string, "30m")
-      delete = optional(string, "30m")
-      read   = optional(string, "5m")
-      update = optional(string, "30m")
-    }), {})
     private_dns_zone_group = optional(object({
       create = optional(string, "30m")
       delete = optional(string, "30m")
