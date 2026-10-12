@@ -85,6 +85,85 @@ terraform state mv 'azurerm_example_part.this["a"]' 'module.part["a"].azapi_reso
 
 Back up state before imperative changes.
 
+## State transition mechanism selection
+
+Choose the state mechanism from the relationship between the old Terraform state address, the new Terraform state address, and the existing Azure object:
+
+- Use `moved` when an old Terraform address has a direct new Terraform address, such as the primary resource moving from `azurerm_example_widget.this` to `azapi_resource.this`, or role assignments and locks moving to AzAPI resources at the same cardinality boundary.
+- Use `removed { destroy = false }` when an old Terraform address disappears because the remote object is intentionally represented elsewhere, such as a legacy child/association resource that is now folded into the parent AzAPI resource body.
+- Use `import` when an existing Azure object needs a new Terraform address but did not previously have a standalone Terraform state address, such as an AzureRM inline block that becomes an AzAPI child resource submodule.
+
+Do not import every auxiliary resource by default. Import only newly addressed existing remote objects that cannot be represented with a `moved` block and should remain under Terraform management.
+
+Example folded-resource removal:
+
+```hcl
+removed {
+  from = azurerm_example_association.this
+
+  lifecycle {
+    destroy = false
+  }
+}
+```
+
+Example parent-body representation:
+
+```hcl
+resource "azapi_resource" "this" {
+  body = {
+    properties = {
+      associations = [for id in var.association_ids : { id = id }]
+    }
+  }
+}
+```
+
+## Module-owned managed migration imports
+
+Prefer module-owned, opt-in imports over asking consumers to hand-write root-module import blocks when all of these are true:
+
+1. the module can deterministically construct the existing Azure resource ID from its inputs and newly moved parent resource;
+2. the target address is inside the module or one of its submodules;
+3. the source object did not have a standalone old Terraform state address; and
+4. the migration can be safely disabled after the upgrade.
+
+Gate these imports behind a temporary boolean named `avm_managed_migration_enabled`, defaulting to `false`:
+
+```hcl
+variable "avm_managed_migration_enabled" {
+  type        = bool
+  default     = false
+  description = "Enables module-owned migration helpers for upgrading from earlier AzureRM-backed versions. Set to true only during the upgrade apply, then set back to false."
+  nullable    = false
+}
+```
+
+Terraform `import` blocks with `for_each` require Terraform 1.16 or later. If a module adopts this pattern, update every affected `required_version` constraint and upgrade documentation deliberately, for example:
+
+```hcl
+terraform {
+  required_version = ">= 1.16, < 2.0"
+}
+```
+
+Use an empty `for_each` when the migration flag is disabled or the source object is not configured:
+
+```hcl
+import {
+  for_each = var.avm_managed_migration_enabled && length(var.child_resource_ids) > 0 ? {
+    this = "${azapi_resource.this.id}/childResources/${var.child_resource_name}"
+  } : {}
+
+  to = module.child_resource[0].azapi_resource.this
+  id = each.value
+}
+```
+
+Document the lifecycle clearly: consumers set `avm_managed_migration_enabled = true` for the migration plan/apply, verify no unintended destroy or replacement actions, apply, run a clean follow-up plan, then set it back to `false`.
+
+Do not use this flag for ordinary feature toggles, steady-state configuration, or resources that can be preserved with a normal `moved` block.
+
 ## Target implementation checklist
 
 The AzAPI target must include:
@@ -103,6 +182,18 @@ The AzAPI target must include:
 - standard interfaces composed through `Azure/avm-utl-interfaces/azure ~> 0.6`.
 
 Do not retain AzureRM as a convenience fallback or copy it into target examples and tests. Existing AzureRM configuration is migration input only, except when the target still requires the narrowly documented unsupported data-plane/non-ARM operation.
+
+## AzureRM-to-AzAPI review hazards
+
+Check these hazards explicitly during remediation reviews:
+
+- **ForceNew-equivalent fields:** AzureRM may have forced replacement for fields that become AzAPI body properties. Preserve replacement semantics with `replace_triggers_external_values` when body paths are unstable, Azure-normalized, or null immediately after provider state conversion. Use input values rather than computed body paths when that avoids first-plan false replacements after `moved` blocks.
+- **Invalid ARM child types:** Some AzureRM helper resources are not real ARM child resource types. Do not model them as AzAPI resources unless the ARM type exists and plans successfully. Fold them into the parent body, use `removed { destroy = false }` for the old address, and test with non-default interface inputs that exercise the path.
+- **Subresource extraction:** ARM subresources become TFRMNFR1 submodules. If the old implementation modeled the child inline, use module-owned conditional imports or explicit consumer import guidance; a `moved` block cannot move an inline nested block that never had its own state address.
+- **Role assignment names:** Upgraded role assignments often keep AzureRM-generated GUIDs while the interface module computes new names. Add `lifecycle { ignore_changes = [name] }` when replacing names would delete and recreate existing assignments.
+- **Locks:** Preserve legacy lock default names and notes so upgrades do not rename or drift locks. Document that `ReadOnly` locks block in-place PUT updates; consumers must remove them before migration and restore them afterward.
+- **ScopeLocked destroy ordering:** A deleted `CanNotDelete` lock can continue to be enforced briefly. When a module manages locks and protected child resources, make any lock-removal sleep conditional on a lock being configured and depend on every resource protected by that lock, not only the primary resource.
+- **Coverage:** Add or update examples/tests that exercise locks, role assignments, subresources, associations, and other optional interfaces. Default bare-resource examples are insufficient migration evidence.
 
 ## Ignore semantics during migration
 
