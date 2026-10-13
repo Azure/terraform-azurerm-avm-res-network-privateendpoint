@@ -101,7 +101,7 @@ resource "azapi_resource" "storage_account" {
       supportsHttpsTrafficOnly = true
     }
     sku = {
-      name = "Standard_LRS"
+      name = "Standard_ZRS"
     }
   }
   response_export_values = {
