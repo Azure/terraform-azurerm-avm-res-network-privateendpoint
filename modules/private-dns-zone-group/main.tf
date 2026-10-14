@@ -1,7 +1,7 @@
 resource "azapi_resource" "this" {
   name      = var.name
-  parent_id = var.private_endpoint_id
-  type      = var.resource_type
+  parent_id = var.parent_id
+  type      = var.resource_types.network_private_endpoints_private_dns_zone_groups
   body = {
     properties = {
       privateDnsZoneConfigs = [
@@ -14,22 +14,23 @@ resource "azapi_resource" "this" {
       ]
     }
   }
-  create_headers = var.headers
-  delete_headers = var.headers
-  read_headers   = var.headers
+  create_headers      = var.headers
+  delete_headers      = var.headers
+  ignore_body_changes = length(var.ignore_body_changes.network_private_endpoints_private_dns_zone_groups) > 0 ? var.ignore_body_changes.network_private_endpoints_private_dns_zone_groups : null
+  read_headers        = var.headers
   response_export_values = {
-    id         = "id"
-    name       = "name"
-    properties = "properties"
-    type       = "type"
+    private_dns_zone_configs = "properties.privateDnsZoneConfigs"
   }
   retry          = var.retry
   update_headers = var.headers
 
-  timeouts {
-    create = var.timeouts.create
-    delete = var.timeouts.delete
-    read   = var.timeouts.read
-    update = var.timeouts.update
+  dynamic "timeouts" {
+    for_each = var.timeouts == null ? [] : [var.timeouts]
+    content {
+      create = timeouts.value.create
+      delete = timeouts.value.delete
+      read   = timeouts.value.read
+      update = timeouts.value.update
+    }
   }
 }

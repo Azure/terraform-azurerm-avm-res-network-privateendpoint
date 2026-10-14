@@ -11,11 +11,18 @@ terraform-azurerm-avm-res-network-privateendpoint
 
 This version manages the private endpoint with AzAPI and includes migration blocks for the private endpoint, role assignments, application security group associations, private DNS zone groups, and locks. Terraform 1.16 or later is required because the module uses opt-in managed import blocks for AzureRM inline resources that now have AzAPI child-resource addresses.
 
-Run `terraform init -upgrade`, set `avm_managed_migration_enabled = true`, then run `terraform plan`. Expect in-place updates while AzAPI takes over existing resources and new `random_uuid` resources when role assignments are configured. Do not apply a plan that destroys or replaces the private endpoint, lock, role assignments, or private DNS zone group.
+Before upgrading, update the consumer configuration:
+
+- Replace `resource_group_name` with the required `parent_id` resource-group ID.
+- Replace uses of the whole `resource` output with the discrete `name`, `resource_id`, `private_ip_addresses`, or `network_interface_ids` outputs. The old AzureRM-shaped object is no longer exposed.
+- Remove `role_assignment_name_use_random_uuid`; the module now uses `Azure/avm-utl-interfaces` 0.7.0. Existing AzureRM role-assignment GUIDs are preserved during migration.
+- Pass `application_security_group_association_ids` as before. The associations are represented in the private endpoint body and the old standalone association state is detached without destroying the Azure relationship.
+
+Run `terraform init -upgrade`, set `avm_managed_migration_enabled = true`, then run `terraform plan`. Expect in-place updates while AzAPI takes over existing resources. Do not apply a plan that destroys or replaces the private endpoint, lock, role assignments, application security group associations, or private DNS zone group.
 
 The private DNS zone group is now managed by a submodule because it is a child resource of the private endpoint. If you set `private_dns_zone_resource_ids`, `avm_managed_migration_enabled = true` causes the module to import the existing DNS zone group into `module.private_dns_zone_group[0].azapi_resource.this` during the migration apply. The import ID is built from the private endpoint ID and `private_dns_zone_group_name`; when `private_dns_zone_group_name` is not set, the module uses `default`.
 
-After one successful migration apply and a clean follow-up plan, set `avm_managed_migration_enabled = false` again.
+After one successful migration apply, verify the private endpoint ID and configured ASG associations remain unchanged, then run a clean follow-up plan. Set `avm_managed_migration_enabled = false` again after that plan is clean.
 
 One case still needs an extra step:
 

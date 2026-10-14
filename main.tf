@@ -2,7 +2,7 @@ resource "azapi_resource" "this" {
   location  = var.location
   name      = var.name
   parent_id = var.parent_id
-  type      = var.resource_types.private_endpoint
+  type      = var.resource_types.network_private_endpoints
   body = {
     properties = {
       applicationSecurityGroups  = [for id in var.application_security_group_association_ids : { id = id }]
@@ -33,7 +33,7 @@ resource "azapi_resource" "this" {
   }
   create_headers      = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
   delete_headers      = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
-  ignore_body_changes = length(var.ignore_body_changes.private_endpoint) > 0 ? var.ignore_body_changes.private_endpoint : null
+  ignore_body_changes = length(var.ignore_body_changes.network_private_endpoints) > 0 ? var.ignore_body_changes.network_private_endpoints : null
   read_headers        = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
   replace_triggers_external_values = {
     ip_configurations               = var.ip_configurations
@@ -53,11 +53,24 @@ resource "azapi_resource" "this" {
   tags           = var.tags
   update_headers = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
 
-  timeouts {
-    create = var.timeouts.private_endpoint.create
-    delete = var.timeouts.private_endpoint.delete
-    read   = var.timeouts.private_endpoint.read
-    update = var.timeouts.private_endpoint.update
+  dynamic "timeouts" {
+    for_each = var.timeouts == null ? [] : [var.timeouts]
+    content {
+      create = timeouts.value.create
+      delete = timeouts.value.delete
+      read   = timeouts.value.read
+      update = timeouts.value.update
+    }
+  }
+}
+
+data "azapi_resource_list" "role_definitions" {
+  count = length(var.role_assignments) > 0 ? 1 : 0
+
+  parent_id = var.parent_id
+  type      = "Microsoft.Authorization/roleDefinitions@2022-04-01"
+  response_export_values = {
+    results = "value[].{id: id, role_name: properties.roleName}"
   }
 }
 
@@ -66,12 +79,13 @@ module "private_dns_zone_group" {
   count  = length(var.private_dns_zone_resource_ids) > 0 ? 1 : 0
 
   name                          = local.private_dns_zone_group_name
+  parent_id                     = azapi_resource.this.id
   private_dns_zone_resource_ids = var.private_dns_zone_resource_ids
-  private_endpoint_id           = azapi_resource.this.id
-  resource_type                 = var.resource_types.private_dns_zone_group
   headers                       = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+  ignore_body_changes           = var.ignore_body_changes.network_private_endpoints_private_dns_zone_groups
+  resource_types                = var.resource_types.network_private_endpoints_private_dns_zone_groups
   retry                         = var.retry
-  timeouts                      = var.timeouts.private_dns_zone_group
+  timeouts                      = var.timeouts
 }
 
 import {
@@ -83,58 +97,84 @@ import {
 
 module "avm_interfaces" {
   source  = "Azure/avm-utl-interfaces/azure"
-  version = "0.5.0"
+  version = "0.7.0"
 
   enable_telemetry                          = var.enable_telemetry
-  lock                                      = var.lock
-  role_assignment_definition_lookup_enabled = true
-  role_assignment_definition_scope          = azapi_resource.this.id
-  role_assignment_name_use_random_uuid      = var.role_assignment_name_use_random_uuid
-  role_assignments                          = var.role_assignments
+  lock                                      = local.lock
+  role_assignment_definition_lookup_enabled = false
+  role_assignments                          = local.role_assignments
 }
 
 resource "azapi_resource" "role_assignments" {
-  for_each = module.avm_interfaces.role_assignments_azapi
+  for_each = var.role_assignments
 
-  name           = each.value.name
-  parent_id      = azapi_resource.this.id
-  type           = each.value.type
-  body           = each.value.body
-  create_headers = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
-  delete_headers = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
-  read_headers   = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
-  response_export_values = {
-    id               = "id"
-    name             = "name"
-    principalId      = "properties.principalId"
-    principalType    = "properties.principalType"
-    roleDefinitionId = "properties.roleDefinitionId"
-    scope            = "properties.scope"
-    type             = "type"
+  name                 = module.avm_interfaces.role_assignments_azapi[each.key].name
+  parent_id            = azapi_resource.this.id
+  type                 = var.resource_types.authorization_role_assignments
+  body                 = module.avm_interfaces.role_assignments_azapi[each.key].body
+  create_headers       = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+  delete_headers       = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+  ignore_body_changes  = length(var.ignore_body_changes.authorization_role_assignments) > 0 ? var.ignore_body_changes.authorization_role_assignments : null
+  ignore_casing        = true
+  ignore_null_property = true
+  read_headers         = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+  replace_triggers_external_values = {
+    condition                              = each.value.condition
+    condition_version                      = each.value.condition_version
+    delegated_managed_identity_resource_id = each.value.delegated_managed_identity_resource_id
+    description                            = each.value.description
+    principal_id                           = lower(each.value.principal_id)
+    principal_type                         = local.role_assignments[each.key].principal_type
+    role_definition_id_or_name             = lower(each.value.role_definition_id_or_name)
   }
-  update_headers = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+  response_export_values = []
+  retry                  = var.retry
+  update_headers         = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+
+  dynamic "timeouts" {
+    for_each = var.timeouts == null ? [] : [var.timeouts]
+    content {
+      create = timeouts.value.create
+      delete = timeouts.value.delete
+      read   = timeouts.value.read
+      update = timeouts.value.update
+    }
+  }
 
   lifecycle {
     ignore_changes = [name]
+
+    precondition {
+      condition     = strcontains(lower(local.role_assignments[each.key].role_definition_id_or_name), local.role_definition_resource_substring)
+      error_message = "Role definition `${each.value.role_definition_id_or_name}` was not found. Use an assignable role name or a role definition resource ID."
+    }
   }
 }
 
 resource "azapi_resource" "lock" {
   count = var.lock != null ? 1 : 0
 
-  name      = coalesce(var.lock.name, "lock-${var.lock.kind}")
-  parent_id = azapi_resource.this.id
-  type      = module.avm_interfaces.lock_azapi.type
-  body = {
-    properties = {
-      level = var.lock.kind
-      notes = lookup(local.lock_notes, var.lock.kind, null)
+  name                   = local.lock.name
+  parent_id              = azapi_resource.this.id
+  type                   = var.resource_types.authorization_locks
+  body                   = module.avm_interfaces.lock_azapi.body
+  create_headers         = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+  delete_headers         = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+  ignore_body_changes    = length(var.ignore_body_changes.authorization_locks) > 0 ? var.ignore_body_changes.authorization_locks : null
+  read_headers           = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+  response_export_values = []
+  retry                  = var.retry
+  update_headers         = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
+
+  dynamic "timeouts" {
+    for_each = var.timeouts == null ? [] : [var.timeouts]
+    content {
+      create = timeouts.value.create
+      delete = timeouts.value.delete
+      read   = timeouts.value.read
+      update = timeouts.value.update
     }
   }
-  create_headers = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
-  delete_headers = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
-  read_headers   = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
-  update_headers = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
 
   depends_on = [time_sleep.wait_for_resource_destroy]
 }

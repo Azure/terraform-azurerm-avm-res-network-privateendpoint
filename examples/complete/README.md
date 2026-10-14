@@ -68,6 +68,9 @@ resource "azapi_resource" "private_dns_zone" {
   response_export_values = {
     name = "name"
   }
+  retry = {
+    error_message_regex = ["CannotDeleteResource"]
+  }
 }
 
 resource "azapi_resource" "private_dns_zone_virtual_network_link" {
@@ -121,16 +124,28 @@ resource "azapi_resource" "user_assigned_identity" {
   }
 }
 
+resource "azapi_resource" "application_security_group" {
+  location  = azapi_resource.resource_group.location
+  name      = "asg-pe-int-${random_string.suffix.result}"
+  parent_id = azapi_resource.resource_group.id
+  type      = "Microsoft.Network/applicationSecurityGroups@2024-05-01"
+  body      = {}
+  response_export_values = {
+    name = "name"
+  }
+}
+
 module "test" {
   source = "../../"
 
-  location                       = azapi_resource.resource_group.location
-  name                           = "pe-avm-int-${random_string.suffix.result}"
-  network_interface_name         = "nic-pe-avm-int-${random_string.suffix.result}"
-  parent_id                      = azapi_resource.resource_group.id
-  private_connection_resource_id = azapi_resource.storage_account.id
-  subnet_resource_id             = azapi_resource.subnet.id
-  enable_telemetry               = var.enable_telemetry
+  location                                   = azapi_resource.resource_group.location
+  name                                       = "pe-avm-int-${random_string.suffix.result}"
+  network_interface_name                     = "nic-pe-avm-int-${random_string.suffix.result}"
+  parent_id                                  = azapi_resource.resource_group.id
+  private_connection_resource_id             = azapi_resource.storage_account.id
+  subnet_resource_id                         = azapi_resource.subnet.id
+  application_security_group_association_ids = [azapi_resource.application_security_group.id]
+  enable_telemetry                           = var.enable_telemetry
   lock = {
     kind = "CanNotDelete"
   }
@@ -158,6 +173,19 @@ output "user_assigned_identity_resource_id" {
   description = "The resource ID of the user-assigned managed identity used for role assignment coverage."
   value       = azapi_resource.user_assigned_identity.id
 }
+
+output "application_security_group_association_ids" {
+  description = "Application security groups reported as attached to the private endpoint."
+
+  precondition {
+    condition = contains(
+      [for id in module.test.application_security_group_association_ids : lower(id)],
+      lower(azapi_resource.application_security_group.id)
+    )
+    error_message = "The complete example private endpoint must retain its configured application security group association."
+  }
+  value = module.test.application_security_group_association_ids
+}
 ```
 
 <!-- markdownlint-disable MD033 -->
@@ -177,6 +205,7 @@ The following requirements are needed by this module:
 
 The following resources are used by this module:
 
+- [azapi_resource.application_security_group](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
 - [azapi_resource.private_dns_zone](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
 - [azapi_resource.private_dns_zone_virtual_network_link](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
 - [azapi_resource.resource_group](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
@@ -209,6 +238,10 @@ Default: `true`
 ## Outputs
 
 The following outputs are exported:
+
+### <a name="output_application_security_group_association_ids"></a> [application\_security\_group\_association\_ids](#output\_application\_security\_group\_association\_ids)
+
+Description: Application security groups reported as attached to the private endpoint.
 
 ### <a name="output_private_endpoint_resource_id"></a> [private\_endpoint\_resource\_id](#output\_private\_endpoint\_resource\_id)
 

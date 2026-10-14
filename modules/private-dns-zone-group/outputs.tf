@@ -3,9 +3,9 @@ output "name" {
   value       = azapi_resource.this.name
 }
 
-output "resource" {
-  description = "Output of the private DNS zone group resource."
-  value       = azapi_resource.this
+output "private_dns_zone_configs" {
+  description = "Private DNS zone configurations and record sets returned for the private endpoint."
+  value       = azapi_resource.this.output.private_dns_zone_configs
 }
 
 output "resource_id" {

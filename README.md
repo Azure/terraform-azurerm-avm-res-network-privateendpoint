@@ -13,11 +13,18 @@ terraform-azurerm-avm-res-network-privateendpoint
 
 This version manages the private endpoint with AzAPI and includes migration blocks for the private endpoint, role assignments, application security group associations, private DNS zone groups, and locks. Terraform 1.16 or later is required because the module uses opt-in managed import blocks for AzureRM inline resources that now have AzAPI child-resource addresses.
 
-Run `terraform init -upgrade`, set `avm_managed_migration_enabled = true`, then run `terraform plan`. Expect in-place updates while AzAPI takes over existing resources and new `random_uuid` resources when role assignments are configured. Do not apply a plan that destroys or replaces the private endpoint, lock, role assignments, or private DNS zone group.
+Before upgrading, update the consumer configuration:
+
+- Replace `resource_group_name` with the required `parent_id` resource-group ID.
+- Replace uses of the whole `resource` output with the discrete `name`, `resource_id`, `private_ip_addresses`, or `network_interface_ids` outputs. The old AzureRM-shaped object is no longer exposed.
+- Remove `role_assignment_name_use_random_uuid`; the module now uses `Azure/avm-utl-interfaces` 0.7.0. Existing AzureRM role-assignment GUIDs are preserved during migration.
+- Pass `application_security_group_association_ids` as before. The associations are represented in the private endpoint body and the old standalone association state is detached without destroying the Azure relationship.
+
+Run `terraform init -upgrade`, set `avm_managed_migration_enabled = true`, then run `terraform plan`. Expect in-place updates while AzAPI takes over existing resources. Do not apply a plan that destroys or replaces the private endpoint, lock, role assignments, application security group associations, or private DNS zone group.
 
 The private DNS zone group is now managed by a submodule because it is a child resource of the private endpoint. If you set `private_dns_zone_resource_ids`, `avm_managed_migration_enabled = true` causes the module to import the existing DNS zone group into `module.private_dns_zone_group[0].azapi_resource.this` during the migration apply. The import ID is built from the private endpoint ID and `private_dns_zone_group_name`; when `private_dns_zone_group_name` is not set, the module uses `default`.
 
-After one successful migration apply and a clean follow-up plan, set `avm_managed_migration_enabled = false` again.
+After one successful migration apply, verify the private endpoint ID and configured ASG associations remain unchanged, then run a clean follow-up plan. Set `avm_managed_migration_enabled = false` again after that plan is clean.
 
 One case still needs an extra step:
 
@@ -49,6 +56,7 @@ The following resources are used by this module:
 - [random_uuid.telemetry](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/uuid) (resource)
 - [time_sleep.wait_for_resource_destroy](https://registry.terraform.io/providers/hashicorp/time/latest/docs/resources/sleep) (resource)
 - [azapi_client_config.telemetry](https://registry.terraform.io/providers/Azure/azapi/latest/docs/data-sources/client_config) (data source)
+- [azapi_resource_list.role_definitions](https://registry.terraform.io/providers/Azure/azapi/latest/docs/data-sources/resource_list) (data source)
 - [modtm_module_source.telemetry](https://registry.terraform.io/providers/azure/modtm/latest/docs/data-sources/module_source) (data source)
 
 <!-- markdownlint-disable MD013 -->
@@ -124,13 +132,24 @@ Default: `true`
 
 ### <a name="input_ignore_body_changes"></a> [ignore\_body\_changes](#input\_ignore\_body\_changes)
 
-Description: A map of AzAPI body paths to ignore for each resource.
+Description: Body-relative dot-notation paths the AzAPI provider ignores for each resource. Ignored configuration is not sent to Azure until the path is removed. Changes take effect only after apply. A non-empty value requires Terraform 1.11 or later.
+
+- `authorization_locks` - Ignored paths for the lock.
+- `authorization_role_assignments` - Ignored paths for role assignments.
+- `network_private_endpoints` - Ignored paths for the private endpoint.
+- `network_private_endpoints_private_dns_zone_groups` - Override slot for the DNS zone group submodule.
+  - `network_private_endpoints_private_dns_zone_groups` - Ignored paths for the DNS zone group.
 
 Type:
 
 ```hcl
 object({
-    private_endpoint = optional(list(string), [])
+    authorization_locks            = optional(list(string), [])
+    authorization_role_assignments = optional(list(string), [])
+    network_private_endpoints      = optional(list(string), [])
+    network_private_endpoints_private_dns_zone_groups = optional(object({
+      network_private_endpoints_private_dns_zone_groups = optional(list(string), [])
+    }), {})
   })
 ```
 
@@ -172,14 +191,19 @@ Default: `{}`
 
 ### <a name="input_lock"></a> [lock](#input\_lock)
 
-Description: The lock level to apply. Default is `None`. Possible values are `None`, `CanNotDelete`, and `ReadOnly`.
+Description: Controls the resource lock configuration for this private endpoint.
+
+- `kind` - (Required) The type of lock. Possible values are `CanNotDelete` and `ReadOnly`.
+- `name` - (Optional) The lock name. If omitted, the module preserves the previous `lock-<kind>` name.
+- `notes` - (Optional) Notes written to `Microsoft.Authorization/locks.properties.notes`. The module preserves its previous default notes when omitted.
 
 Type:
 
 ```hcl
 object({
-    name = optional(string, null)
-    kind = string
+    kind  = string
+    name  = optional(string, null)
+    notes = optional(string, null)
   })
 ```
 
@@ -211,14 +235,24 @@ Default: `null`
 
 ### <a name="input_resource_types"></a> [resource\_types](#input\_resource\_types)
 
-Description: The Azure resource type API versions used by this module.
+Description: AzAPI resource types and API versions used by this module and its submodule. Supply only the keys to override.
+
+- `authorization_locks` - The management lock.
+- `authorization_role_assignments` - Role assignments on the private endpoint.
+- `network_private_endpoints` - The private endpoint.
+- `network_private_endpoints_private_dns_zone_groups` - Overrides for the private DNS zone group submodule.
+  - `network_private_endpoints_private_dns_zone_groups` - The private DNS zone group managed by the submodule.
 
 Type:
 
 ```hcl
 object({
-    private_dns_zone_group = optional(string, "Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01")
-    private_endpoint       = optional(string, "Microsoft.Network/privateEndpoints@2024-05-01")
+    authorization_locks            = optional(string, "Microsoft.Authorization/locks@2020-05-01")
+    authorization_role_assignments = optional(string, "Microsoft.Authorization/roleAssignments@2022-04-01")
+    network_private_endpoints      = optional(string, "Microsoft.Network/privateEndpoints@2025-07-01")
+    network_private_endpoints_private_dns_zone_groups = optional(object({
+      network_private_endpoints_private_dns_zone_groups = optional(string)
+    }), {})
   })
 ```
 
@@ -226,34 +260,31 @@ Default: `{}`
 
 ### <a name="input_retry"></a> [retry](#input\_retry)
 
-Description: Retry configuration for AzAPI resource operations.
+Description: Retry configuration applied to every AzAPI resource in this module and its submodule. Defaults to provider retry behavior.
+
+- `error_message_regex` - (Optional) Error-message patterns that trigger a retry.
+- `interval_seconds` - (Optional) Initial interval between retries in seconds.
+- `max_interval_seconds` - (Optional) Maximum interval between retries in seconds.
+
+See the AzAPI provider `retry` documentation for full semantics.
 
 Type:
 
 ```hcl
 object({
-    error_message_regex  = optional(list(string), ["ReferencedResourceNotProvisioned", "CannotDeleteResource"])
-    interval_seconds     = optional(number, 10)
-    max_interval_seconds = optional(number, 180)
-    multiplier           = optional(number, 1.5)
-    randomization_factor = optional(number, 0.5)
+    error_message_regex  = optional(list(string))
+    interval_seconds     = optional(number)
+    max_interval_seconds = optional(number)
   })
 ```
 
-Default: `{}`
-
-### <a name="input_role_assignment_name_use_random_uuid"></a> [role\_assignment\_name\_use\_random\_uuid](#input\_role\_assignment\_name\_use\_random\_uuid)
-
-Description: Use a random UUID for role assignment names to avoid duplicate deterministic IDs across scopes.
-
-Type: `bool`
-
-Default: `true`
+Default: `null`
 
 ### <a name="input_role_assignments"></a> [role\_assignments](#input\_role\_assignments)
 
-Description: A map of role assignments to create on this resource. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
+Description: A map of role assignments to create on this private endpoint. The map key is deliberately arbitrary to avoid issues where map keys may be unknown at plan time.
 
+- `name` - (Optional) The role assignment GUID. If omitted, the interfaces module generates one. During migration, existing AzureRM names are preserved.
 - `role_definition_id_or_name` - The ID or name of the role definition to assign to the principal.
 - `principal_id` - The ID of the principal to assign the role to.
 - `description` - The description of the role assignment.
@@ -285,6 +316,7 @@ Type:
 
 ```hcl
 map(object({
+    name                                   = optional(string, null)
     role_definition_id_or_name             = string
     principal_id                           = string
     description                            = optional(string, null)
@@ -316,40 +348,45 @@ Default: `null`
 
 ### <a name="input_timeouts"></a> [timeouts](#input\_timeouts)
 
-Description: Timeout configuration for resources created by this module.
+Description: Default per-operation timeouts applied to every AzAPI resource in this module and its submodule. Defaults to provider timeouts. Values are Go duration strings such as `30m` or `1h`.
+
+- `create` - (Optional) Timeout for create operations.
+- `read` - (Optional) Timeout for read operations.
+- `update` - (Optional) Timeout for update operations.
+- `delete` - (Optional) Timeout for delete operations.
 
 Type:
 
 ```hcl
 object({
-    private_dns_zone_group = optional(object({
-      create = optional(string, "30m")
-      delete = optional(string, "30m")
-      read   = optional(string, "5m")
-      update = optional(string, "30m")
-    }), {})
-    private_endpoint = optional(object({
-      create = optional(string, "30m")
-      delete = optional(string, "30m")
-      read   = optional(string, "5m")
-      update = optional(string, "30m")
-    }), {})
+    create = optional(string)
+    read   = optional(string)
+    update = optional(string)
+    delete = optional(string)
   })
 ```
 
-Default: `{}`
+Default: `null`
 
 ## Outputs
 
 The following outputs are exported:
 
+### <a name="output_application_security_group_association_ids"></a> [application\_security\_group\_association\_ids](#output\_application\_security\_group\_association\_ids)
+
+Description: The resource IDs of application security groups attached to the private endpoint.
+
 ### <a name="output_name"></a> [name](#output\_name)
 
 Description: Name of the resource.
 
-### <a name="output_resource"></a> [resource](#output\_resource)
+### <a name="output_network_interface_ids"></a> [network\_interface\_ids](#output\_network\_interface\_ids)
 
-Description: Output of the resource.
+Description: The resource IDs of the network interfaces created for the private endpoint.
+
+### <a name="output_private_ip_addresses"></a> [private\_ip\_addresses](#output\_private\_ip\_addresses)
+
+Description: The private IP addresses assigned to the private endpoint.
 
 ### <a name="output_resource_id"></a> [resource\_id](#output\_resource\_id)
 
@@ -363,7 +400,7 @@ The following Modules are called:
 
 Source: Azure/avm-utl-interfaces/azure
 
-Version: 0.5.0
+Version: 0.7.0
 
 ### <a name="module_private_dns_zone_group"></a> [private\_dns\_zone\_group](#module\_private\_dns\_zone\_group)
 

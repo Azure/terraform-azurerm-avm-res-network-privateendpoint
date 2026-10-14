@@ -30,23 +30,17 @@ Description: Name of the private DNS zone group.
 
 Type: `string`
 
+### <a name="input_parent_id"></a> [parent\_id](#input\_parent\_id)
+
+Description: Fully-qualified ARM resource ID of the parent private endpoint.
+
+Type: `string`
+
 ### <a name="input_private_dns_zone_resource_ids"></a> [private\_dns\_zone\_resource\_ids](#input\_private\_dns\_zone\_resource\_ids)
 
 Description: Private DNS zone resource IDs to include in the private DNS zone group.
 
 Type: `list(string)`
-
-### <a name="input_private_endpoint_id"></a> [private\_endpoint\_id](#input\_private\_endpoint\_id)
-
-Description: Resource ID of the parent private endpoint.
-
-Type: `string`
-
-### <a name="input_resource_type"></a> [resource\_type](#input\_resource\_type)
-
-Description: AzAPI resource type for the private DNS zone group.
-
-Type: `string`
 
 ## Optional Inputs
 
@@ -60,40 +54,68 @@ Type: `map(string)`
 
 Default: `null`
 
-### <a name="input_retry"></a> [retry](#input\_retry)
+### <a name="input_ignore_body_changes"></a> [ignore\_body\_changes](#input\_ignore\_body\_changes)
 
-Description: Retry configuration for AzAPI resource operations.
+Description: Body-relative dot-notation paths ignored by the AzAPI provider. Ignored configuration is not sent to Azure until the path is removed. Changes take effect only after apply.
+
+- `network_private_endpoints_private_dns_zone_groups` - Paths ignored on the private DNS zone group.
 
 Type:
 
 ```hcl
 object({
-    error_message_regex  = optional(list(string), ["ReferencedResourceNotProvisioned", "CannotDeleteResource"])
-    interval_seconds     = optional(number, 10)
-    max_interval_seconds = optional(number, 180)
-    multiplier           = optional(number, 1.5)
-    randomization_factor = optional(number, 0.5)
+    network_private_endpoints_private_dns_zone_groups = optional(list(string), [])
   })
 ```
 
 Default: `{}`
+
+### <a name="input_resource_types"></a> [resource\_types](#input\_resource\_types)
+
+Description: AzAPI resource types and API versions used by the private DNS zone group submodule.
+
+Type:
+
+```hcl
+object({
+    network_private_endpoints_private_dns_zone_groups = optional(string, "Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2025-07-01")
+  })
+```
+
+Default: `{}`
+
+### <a name="input_retry"></a> [retry](#input\_retry)
+
+Description: Retry configuration applied to the private DNS zone group AzAPI resource. Defaults to provider behavior.
+
+Type:
+
+```hcl
+object({
+    error_message_regex  = optional(list(string))
+    interval_seconds     = optional(number)
+    max_interval_seconds = optional(number)
+  })
+```
+
+Default: `null`
 
 ### <a name="input_timeouts"></a> [timeouts](#input\_timeouts)
 
-Description: Timeout configuration for the private DNS zone group.
+Description: Default per-operation timeouts for the private DNS zone group AzAPI resource. Defaults to provider behavior.
 
 Type:
 
 ```hcl
 object({
-    create = optional(string, "30m")
-    delete = optional(string, "30m")
-    read   = optional(string, "5m")
-    update = optional(string, "30m")
+    create = optional(string)
+    read   = optional(string)
+    update = optional(string)
+    delete = optional(string)
   })
 ```
 
-Default: `{}`
+Default: `null`
 
 ## Outputs
 
@@ -103,9 +125,9 @@ The following outputs are exported:
 
 Description: Name of the private DNS zone group.
 
-### <a name="output_resource"></a> [resource](#output\_resource)
+### <a name="output_private_dns_zone_configs"></a> [private\_dns\_zone\_configs](#output\_private\_dns\_zone\_configs)
 
-Description: Output of the private DNS zone group resource.
+Description: Private DNS zone configurations and record sets returned for the private endpoint.
 
 ### <a name="output_resource_id"></a> [resource\_id](#output\_resource\_id)
 
