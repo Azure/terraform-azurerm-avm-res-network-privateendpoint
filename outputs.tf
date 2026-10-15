@@ -13,24 +13,12 @@ output "name" {
 
 output "network_interface_ids" {
   description = "The resource IDs of the network interfaces created for the private endpoint."
-  value = [
-    for network_interface in try(azapi_resource.this.output.properties.networkInterfaces, []) :
-    network_interface.id
-  ]
+  value       = [terraform_data.network_interface_id.output]
 }
 
 output "private_ip_addresses" {
   description = "The private IP addresses assigned to the private endpoint."
-  value = distinct(concat(
-    flatten([
-      for dns_config in try(azapi_resource.this.output.properties.customDnsConfigs, []) :
-      try(dns_config.ipAddresses, [])
-    ]),
-    compact([
-      for ip_configuration in try(azapi_resource.this.output.properties.ipConfigurations, []) :
-      try(ip_configuration.properties.privateIPAddress, "")
-    ])
-  ))
+  value       = data.azapi_resource.network_interface.output.private_ip_addresses
 }
 
 output "resource_id" {

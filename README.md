@@ -16,19 +16,33 @@ This version manages the private endpoint with AzAPI and includes migration bloc
 Before upgrading, update the consumer configuration:
 
 - Replace `resource_group_name` with the required `parent_id` resource-group ID.
-- Replace uses of the whole `resource` output with the discrete `name`, `resource_id`, `private_ip_addresses`, or `network_interface_ids` outputs. The old AzureRM-shaped object is no longer exposed.
+- Replace uses of the whole `resource` output with the discrete `name`, `resource_id`, `private_ip_addresses`, or `network_interface_ids` outputs. The old AzureRM-shaped object is no longer exposed. `private_ip_addresses` is read from the private endpoint network interface, including dynamically assigned addresses when a private DNS zone group is configured.
 - Remove `role_assignment_name_use_random_uuid`; the module now uses `Azure/avm-utl-interfaces` 0.7.0. Existing AzureRM role-assignment GUIDs are preserved during migration.
 - Pass `application_security_group_association_ids` as before. The associations are represented in the private endpoint body and the old standalone association state is detached without destroying the Azure relationship.
 
-Run `terraform init -upgrade`, set `avm_managed_migration_enabled = true`, then run `terraform plan`. Expect in-place updates while AzAPI takes over existing resources. Do not apply a plan that destroys or replaces the private endpoint, lock, role assignments, application security group associations, or private DNS zone group.
+Keep the AzureRM provider configuration in the consumer root through the migration apply so Terraform can process the old AzureRM state. Run `terraform init -upgrade`, set `avm_managed_migration_enabled = true`, then run `terraform plan`. Expect in-place updates while AzAPI takes over existing resources. Do not apply a plan that destroys or replaces the private endpoint, lock, role assignments, application security group associations, or private DNS zone group.
 
 The private DNS zone group is now managed by a submodule because it is a child resource of the private endpoint. If you set `private_dns_zone_resource_ids`, `avm_managed_migration_enabled = true` causes the module to import the existing DNS zone group into `module.private_dns_zone_group[0].azapi_resource.this` during the migration apply. The import ID is built from the private endpoint ID and `private_dns_zone_group_name`; when `private_dns_zone_group_name` is not set, the module uses `default`.
 
 After one successful migration apply, verify the private endpoint ID and configured ASG associations remain unchanged, then run a clean follow-up plan. Set `avm_managed_migration_enabled = false` again after that plan is clean.
 
-One case still needs an extra step:
+Two cases still need extra steps:
 
 - **`ReadOnly` lock.** The upgrade updates the private endpoint in place, which a `ReadOnly` lock blocks. Before upgrading, apply your configuration with `lock = null` using the old version, then upgrade and restore the lock after the migration.
+- **Cross-tenant role assignments** (those that set `delegated_managed_identity_resource_id`, such as Azure Lighthouse). The AzureRM provider stored these role-assignment IDs with a `|<tenant-id>` suffix that the `moved` block cannot convert. Before planning the upgrade, remove each affected assignment from state, then import it at the AzAPI address from the consumer root:
+
+  ```pwsh
+  terraform state rm 'module.<module-name>.azurerm_role_assignment.this["<key>"]'
+  ```
+
+  ```hcl
+  import {
+    to = module.<module-name>.azapi_resource.role_assignments["<key>"]
+    id = "<role assignment ARM resource ID, without the |<tenant-id> suffix>"
+  }
+  ```
+
+  Keep the assignment's existing ARM resource ID and GUID. Confirm the import is planned without creating or deleting the assignment before applying the migration.
 
 <!-- markdownlint-disable MD033 -->
 ## Requirements
@@ -39,10 +53,6 @@ The following requirements are needed by this module:
 
 - <a name="requirement_azapi"></a> [azapi](#requirement\_azapi) (~> 2.12)
 
-- <a name="requirement_modtm"></a> [modtm](#requirement\_modtm) (~> 0.3)
-
-- <a name="requirement_random"></a> [random](#requirement\_random) (~> 3.5)
-
 - <a name="requirement_time"></a> [time](#requirement\_time) (~> 0.13)
 
 ## Resources
@@ -51,13 +61,14 @@ The following resources are used by this module:
 
 - [azapi_resource.lock](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
 - [azapi_resource.role_assignments](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
+- [azapi_resource.telemetry](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
 - [azapi_resource.this](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
-- [modtm_telemetry.telemetry](https://registry.terraform.io/providers/azure/modtm/latest/docs/resources/telemetry) (resource)
-- [random_uuid.telemetry](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/uuid) (resource)
+- [terraform_data.network_interface_id](https://registry.terraform.io/providers/hashicorp/terraform/latest/docs/resources/data) (resource)
+- [terraform_data.telemetry](https://registry.terraform.io/providers/hashicorp/terraform/latest/docs/resources/data) (resource)
 - [time_sleep.wait_for_resource_destroy](https://registry.terraform.io/providers/hashicorp/time/latest/docs/resources/sleep) (resource)
 - [azapi_client_config.telemetry](https://registry.terraform.io/providers/Azure/azapi/latest/docs/data-sources/client_config) (data source)
+- [azapi_resource.network_interface](https://registry.terraform.io/providers/Azure/azapi/latest/docs/data-sources/resource) (data source)
 - [azapi_resource_list.role_definitions](https://registry.terraform.io/providers/Azure/azapi/latest/docs/data-sources/resource_list) (data source)
-- [modtm_module_source.telemetry](https://registry.terraform.io/providers/azure/modtm/latest/docs/data-sources/module_source) (data source)
 
 <!-- markdownlint-disable MD013 -->
 ## Required Inputs

@@ -186,6 +186,16 @@ output "application_security_group_association_ids" {
   }
   value = module.test.application_security_group_association_ids
 }
+
+output "private_ip_addresses" {
+  description = "Private IP addresses reported by the private endpoint network interface."
+
+  precondition {
+    condition     = length(module.test.private_ip_addresses) > 0
+    error_message = "The complete example private endpoint must report at least one private IP address from its network interface."
+  }
+  value = module.test.private_ip_addresses
+}
 ```
 
 <!-- markdownlint-disable MD033 -->
@@ -196,8 +206,6 @@ The following requirements are needed by this module:
 - <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (>= 1.16, < 2.0)
 
 - <a name="requirement_azapi"></a> [azapi](#requirement\_azapi) (~> 2.12)
-
-- <a name="requirement_modtm"></a> [modtm](#requirement\_modtm) (~> 0.3)
 
 - <a name="requirement_random"></a> [random](#requirement\_random) (~> 3.5)
 
@@ -246,6 +254,10 @@ Description: Application security groups reported as attached to the private end
 ### <a name="output_private_endpoint_resource_id"></a> [private\_endpoint\_resource\_id](#output\_private\_endpoint\_resource\_id)
 
 Description: The resource ID of the private endpoint.
+
+### <a name="output_private_ip_addresses"></a> [private\_ip\_addresses](#output\_private\_ip\_addresses)
+
+Description: Private IP addresses reported by the private endpoint network interface.
 
 ### <a name="output_user_assigned_identity_resource_id"></a> [user\_assigned\_identity\_resource\_id](#output\_user\_assigned\_identity\_resource\_id)
 

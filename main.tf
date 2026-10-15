@@ -74,13 +74,32 @@ data "azapi_resource_list" "role_definitions" {
   }
 }
 
+resource "terraform_data" "network_interface_id" {
+  input            = azapi_resource.this.output.properties.networkInterfaces[0].id
+  triggers_replace = azapi_resource.this.id
+
+  lifecycle {
+    ignore_changes = [input]
+  }
+}
+
+data "azapi_resource" "network_interface" {
+  resource_id = terraform_data.network_interface_id.output
+  type        = "Microsoft.Network/networkInterfaces@2025-07-01"
+  response_export_values = {
+    private_ip_addresses = "properties.ipConfigurations[].properties.privateIPAddress"
+  }
+}
+
 module "private_dns_zone_group" {
   source = "./modules/private-dns-zone-group"
   count  = length(var.private_dns_zone_resource_ids) > 0 ? 1 : 0
 
+  location                      = var.location
   name                          = local.private_dns_zone_group_name
   parent_id                     = azapi_resource.this.id
   private_dns_zone_resource_ids = var.private_dns_zone_resource_ids
+  enable_telemetry              = var.enable_telemetry
   headers                       = var.enable_telemetry ? { "User-Agent" : local.avm_azapi_header } : null
   ignore_body_changes           = var.ignore_body_changes.network_private_endpoints_private_dns_zone_groups
   resource_types                = var.resource_types.network_private_endpoints_private_dns_zone_groups

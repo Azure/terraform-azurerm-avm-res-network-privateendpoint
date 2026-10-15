@@ -179,3 +179,13 @@ output "application_security_group_association_ids" {
   }
   value = module.test.application_security_group_association_ids
 }
+
+output "private_ip_addresses" {
+  description = "Private IP addresses reported by the private endpoint network interface."
+
+  precondition {
+    condition     = length(module.test.private_ip_addresses) > 0
+    error_message = "The complete example private endpoint must report at least one private IP address from its network interface."
+  }
+  value = module.test.private_ip_addresses
+}
