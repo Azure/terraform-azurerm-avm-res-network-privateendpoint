@@ -1,4 +1,10 @@
 locals {
+  avm_azapi_header = join(" ", [for k, v in local.avm_azapi_headers : "${k}=${v}"])
+  avm_azapi_headers = !var.enable_telemetry ? {} : {
+    avm_module_source  = local.avm_module_source
+    avm_module_version = local.avm_module_version
+    random_id          = substr(sha1(terraform_data.telemetry[0].id), 0, 4)
+  }
   main_location = var.location
 }
 
@@ -11,6 +17,10 @@ removed {
   lifecycle {
     destroy = false
   }
+}
+
+resource "terraform_data" "telemetry" {
+  count = var.enable_telemetry ? 1 : 0
 }
 
 # tflint-ignore: avm_azapi_resource_tags_required
@@ -45,19 +55,23 @@ resource "azapi_resource" "telemetry" {
 
   lifecycle {
     precondition {
-      condition     = length(local.avm_metadata.telemetryIdPrefix) + length(local.avm_telemetry_version_token) + 8 <= 64 && can(regex("^[A-Za-z0-9_-]+$", local.avm_telemetry_version_token))
       error_message = "The telemetry deployment name must fit Azure's 64-character limit and contain a valid module version."
+      condition     = length(local.avm_metadata.telemetryIdPrefix) + length(local.avm_telemetry_version_token) + 8 <= 64 && can(regex("^[A-Za-z0-9_-]+$", local.avm_telemetry_version_token))
     }
   }
 }
 
 locals {
-  avm_telemetry_module_entry  = try(one([for module in local.avm_telemetry_modules : module if module.Dir == path.module]), null)
-  avm_module_version          = try(local.avm_telemetry_module_entry.Version, "")
-  avm_module_source           = try(local.avm_telemetry_module_entry.Source, "")
   avm_metadata                = jsondecode(file("${path.module}/metadata.json"))
   avm_telemetry_manifest_path = "${path.root}/.terraform/modules/modules.json"
   avm_telemetry_modules       = fileexists(local.avm_telemetry_manifest_path) ? jsondecode(file(local.avm_telemetry_manifest_path)).Modules : []
+  avm_telemetry_module_entry  = try(one([for module in local.avm_telemetry_modules : module if module.Dir == path.module]), null)
+  avm_module_version          = try(local.avm_telemetry_module_entry.Version, "")
+  avm_module_source           = try(local.avm_telemetry_module_entry.Source, "")
+}
+
+locals {
+  avm_telemetry_version_token = replace(coalesce(local.avm_module_version, "0.0.0"), ".", "-")
 }
 
 locals {
@@ -67,14 +81,6 @@ locals {
     can(regex("^git::", local.avm_module_source)) ? "g" :
     "x"
   )
-}
-
-locals {
-  avm_telemetry_version_token = replace(coalesce(local.avm_module_version, "0.0.0"), ".", "-")
-}
-
-resource "terraform_data" "telemetry" {
-  count = var.enable_telemetry ? 1 : 0
 }
 
 removed {
