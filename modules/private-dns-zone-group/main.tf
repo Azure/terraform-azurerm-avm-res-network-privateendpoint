@@ -14,15 +14,11 @@ resource "azapi_resource" "this" {
       ]
     }
   }
-  create_headers      = var.headers
-  delete_headers      = var.headers
   ignore_body_changes = length(var.ignore_body_changes.network_private_endpoints_private_dns_zone_groups) > 0 ? var.ignore_body_changes.network_private_endpoints_private_dns_zone_groups : null
-  read_headers        = var.headers
   response_export_values = {
     private_dns_zone_configs = "properties.privateDnsZoneConfigs"
   }
-  retry          = var.retry
-  update_headers = var.headers
+  retry = var.retry
 
   dynamic "timeouts" {
     for_each = var.timeouts == null ? [] : [var.timeouts]

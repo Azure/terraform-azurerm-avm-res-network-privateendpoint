@@ -65,14 +65,6 @@ Type: `bool`
 
 Default: `true`
 
-### <a name="input_headers"></a> [headers](#input\_headers)
-
-Description: Headers to send with AzAPI resource requests.
-
-Type: `map(string)`
-
-Default: `null`
-
 ### <a name="input_ignore_body_changes"></a> [ignore\_body\_changes](#input\_ignore\_body\_changes)
 
 Description: Body-relative dot-notation paths ignored by the AzAPI provider. Ignored configuration is not sent to Azure until the path is removed. Changes take effect only after apply.

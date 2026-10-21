@@ -45,12 +45,6 @@ DESCRIPTION
   nullable    = false
 }
 
-variable "headers" {
-  type        = map(string)
-  default     = null
-  description = "Headers to send with AzAPI resource requests."
-}
-
 variable "ignore_body_changes" {
   type = object({
     network_private_endpoints_private_dns_zone_groups = optional(list(string), [])

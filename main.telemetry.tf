@@ -1,10 +1,4 @@
 locals {
-  avm_azapi_header = join(" ", [for k, v in local.avm_azapi_headers : "${k}=${v}"])
-  avm_azapi_headers = !var.enable_telemetry ? {} : {
-    avm_module_source  = local.avm_module_source
-    avm_module_version = local.avm_module_version
-    random_id          = substr(sha1(terraform_data.telemetry[0].id), 0, 4)
-  }
   main_location = var.location
 }
 
@@ -55,8 +49,8 @@ resource "azapi_resource" "telemetry" {
 
   lifecycle {
     precondition {
-      error_message = "The telemetry deployment name must fit Azure's 64-character limit and contain a valid module version."
       condition     = length(local.avm_metadata.telemetryIdPrefix) + length(local.avm_telemetry_version_token) + 8 <= 64 && can(regex("^[A-Za-z0-9_-]+$", local.avm_telemetry_version_token))
+      error_message = "The telemetry deployment name must fit Azure's 64-character limit and contain a valid module version."
     }
   }
 }
