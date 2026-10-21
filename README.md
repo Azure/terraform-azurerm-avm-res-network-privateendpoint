@@ -411,7 +411,7 @@ The following Modules are called:
 
 Source: Azure/avm-utl-interfaces/azure
 
-Version: 0.7.0
+Version: 0.9.0
 
 ### <a name="module_private_dns_zone_group"></a> [private\_dns\_zone\_group](#module\_private\_dns\_zone\_group)
 

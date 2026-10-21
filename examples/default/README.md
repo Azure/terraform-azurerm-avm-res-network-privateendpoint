@@ -4,14 +4,24 @@
 
 This deploys the module in its simplest form.
 
+The naming utility uses `legacy_mode = true` to preserve the original example's naming conventions when upgrading from `Azure/naming/azurerm`.
+
 ```hcl
 terraform {
   required_version = ">= 1.16, < 2.0"
 
   required_providers {
+    azapi = {
+      source  = "Azure/azapi"
+      version = "~> 2.12"
+    }
     azurerm = {
       source  = "hashicorp/azurerm"
       version = ">= 3.7.0, < 5.0.0"
+    }
+    modtm = {
+      source  = "registry.terraform.io/azure/modtm"
+      version = "~> 0.3"
     }
     random = {
       source  = "hashicorp/random"
@@ -47,13 +57,16 @@ resource "random_integer" "region_index" {
 
 # This ensures we have unique CAF compliant names for our resources.
 module "naming" {
-  source  = "Azure/naming/azurerm"
-  version = "0.4.4"
+  source  = "Azure/avm-utl-naming/azure"
+  version = "0.2.0"
+
+  legacy_mode = true
 }
 
 module "resource_group" {
-  source  = "Azure/avm-res-resources-resourcegroup/azurerm"
-  version = "0.4.0"
+  source    = "Azure/avm-res-resources-resourcegroup/azurerm"
+  version   = "0.4.0"
+  providers = { modtm = modtm }
 
   location         = module.regions.regions[random_integer.region_index.result].name
   name             = module.naming.resource_group.name_unique
@@ -61,8 +74,9 @@ module "resource_group" {
 }
 
 module "key_vault" {
-  source  = "Azure/avm-res-keyvault-vault/azurerm"
-  version = "0.11.0"
+  source    = "Azure/avm-res-keyvault-vault/azurerm"
+  version   = "0.11.0"
+  providers = { modtm = modtm }
 
   location            = module.resource_group.location
   name                = module.naming.key_vault.name_unique
@@ -72,8 +86,9 @@ module "key_vault" {
 }
 
 module "virtual_network" {
-  source  = "Azure/avm-res-network-virtualnetwork/azurerm"
-  version = "0.22.2"
+  source    = "Azure/avm-res-network-virtualnetwork/azurerm"
+  version   = "0.22.2"
+  providers = { modtm = modtm }
 
   location         = module.resource_group.location
   parent_id        = module.resource_group.resource_id
@@ -94,6 +109,9 @@ module "virtual_network" {
 # with a data source.
 module "test" {
   source = "../../"
+  providers = {
+    azapi = azapi
+  }
 
   location                       = module.resource_group.location
   name                           = module.naming.private_endpoint.name_unique
@@ -115,7 +133,11 @@ The following requirements are needed by this module:
 
 - <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (>= 1.16, < 2.0)
 
+- <a name="requirement_azapi"></a> [azapi](#requirement\_azapi) (~> 2.12)
+
 - <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) (>= 3.7.0, < 5.0.0)
+
+- <a name="requirement_modtm"></a> [modtm](#requirement\_modtm) (~> 0.3)
 
 - <a name="requirement_random"></a> [random](#requirement\_random) (>= 3.5.0, < 4.0.0)
 
@@ -161,9 +183,9 @@ Version: 0.11.0
 
 ### <a name="module_naming"></a> [naming](#module\_naming)
 
-Source: Azure/naming/azurerm
+Source: Azure/avm-utl-naming/azure
 
-Version: 0.4.4
+Version: 0.2.0
 
 ### <a name="module_regions"></a> [regions](#module\_regions)
 

@@ -130,6 +130,9 @@ resource "azapi_resource" "application_security_group" {
 
 module "test" {
   source = "../../"
+  providers = {
+    azapi = azapi
+  }
 
   location                                   = azapi_resource.resource_group.location
   name                                       = "pe-avm-int-${random_string.suffix.result}"
