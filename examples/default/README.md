@@ -11,6 +11,7 @@ terraform {
   required_version = ">= 1.16, < 2.0"
 
   required_providers {
+    # tflint-ignore: terraform_unused_required_providers
     azapi = {
       source  = "Azure/azapi"
       version = "~> 2.12"
@@ -19,6 +20,7 @@ terraform {
       source  = "hashicorp/azurerm"
       version = ">= 3.7.0, < 5.0.0"
     }
+    # tflint-ignore: terraform_unused_required_providers
     modtm = {
       source  = "registry.terraform.io/azure/modtm"
       version = "~> 0.3"
@@ -64,9 +66,8 @@ module "naming" {
 }
 
 module "resource_group" {
-  source    = "Azure/avm-res-resources-resourcegroup/azurerm"
-  version   = "0.4.0"
-  providers = { modtm = modtm }
+  source  = "Azure/avm-res-resources-resourcegroup/azurerm"
+  version = "0.4.0"
 
   location         = module.regions.regions[random_integer.region_index.result].name
   name             = module.naming.resource_group.name_unique
@@ -74,9 +75,8 @@ module "resource_group" {
 }
 
 module "key_vault" {
-  source    = "Azure/avm-res-keyvault-vault/azurerm"
-  version   = "0.11.0"
-  providers = { modtm = modtm }
+  source  = "Azure/avm-res-keyvault-vault/azurerm"
+  version = "0.11.0"
 
   location            = module.resource_group.location
   name                = module.naming.key_vault.name_unique
@@ -86,9 +86,8 @@ module "key_vault" {
 }
 
 module "virtual_network" {
-  source    = "Azure/avm-res-network-virtualnetwork/azurerm"
-  version   = "0.22.2"
-  providers = { modtm = modtm }
+  source  = "Azure/avm-res-network-virtualnetwork/azurerm"
+  version = "0.22.2"
 
   location         = module.resource_group.location
   parent_id        = module.resource_group.resource_id
@@ -109,9 +108,6 @@ module "virtual_network" {
 # with a data source.
 module "test" {
   source = "../../"
-  providers = {
-    azapi = azapi
-  }
 
   location                       = module.resource_group.location
   name                           = module.naming.private_endpoint.name_unique
