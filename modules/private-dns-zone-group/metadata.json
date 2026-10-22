@@ -1,0 +1,7 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Azure/azure-verified-modules-tools/main/src/Avm.Authoring/Resources/Schemas/v1/avm-module-metadata.schema.json",
+  "moduleDisplayName": "Private Endpoint Private DNS Zone Group",
+  "moduleDescription": "AVM child module for Private Endpoint private DNS zone groups.",
+  "canonicalType": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+  "telemetryIdPrefix": "46d3xtrf.res.8df0f1a"
+}
