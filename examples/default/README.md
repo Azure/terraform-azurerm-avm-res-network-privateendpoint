@@ -76,7 +76,7 @@ module "resource_group" {
 
 module "key_vault" {
   source  = "Azure/avm-res-keyvault-vault/azurerm"
-  version = "0.11.0"
+  version = "0.12.0"
 
   location            = module.resource_group.location
   name                = module.naming.key_vault.name_unique
@@ -87,7 +87,7 @@ module "key_vault" {
 
 module "virtual_network" {
   source  = "Azure/avm-res-network-virtualnetwork/azurerm"
-  version = "0.22.2"
+  version = "0.22.3"
 
   location         = module.resource_group.location
   parent_id        = module.resource_group.resource_id
@@ -175,7 +175,7 @@ The following Modules are called:
 
 Source: Azure/avm-res-keyvault-vault/azurerm
 
-Version: 0.11.0
+Version: 0.12.0
 
 ### <a name="module_naming"></a> [naming](#module\_naming)
 
@@ -205,7 +205,7 @@ Version:
 
 Source: Azure/avm-res-network-virtualnetwork/azurerm
 
-Version: 0.22.2
+Version: 0.22.3
 
 <!-- markdownlint-disable-next-line MD041 -->
 ## Data Collection
