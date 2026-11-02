@@ -27,12 +27,6 @@ The following resources are used by this module:
 
 The following input variables are required:
 
-### <a name="input_location"></a> [location](#input\_location)
-
-Description: The Azure region for this module's resources or telemetry deployment.
-
-Type: `string`
-
 ### <a name="input_name"></a> [name](#input\_name)
 
 Description: Name of the private DNS zone group.
@@ -80,6 +74,14 @@ object({
 ```
 
 Default: `{}`
+
+### <a name="input_location"></a> [location](#input\_location)
+
+Description: The Azure region for this module's resources or telemetry deployment.
+
+Type: `string`
+
+Default: `null`
 
 ### <a name="input_resource_types"></a> [resource\_types](#input\_resource\_types)
 

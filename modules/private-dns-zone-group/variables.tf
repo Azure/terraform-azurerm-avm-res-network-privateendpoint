@@ -1,9 +1,3 @@
-variable "location" {
-  type        = string
-  description = "The Azure region for this module's resources or telemetry deployment."
-  nullable    = false
-}
-
 variable "name" {
   type        = string
   description = "Name of the private DNS zone group."
@@ -56,6 +50,17 @@ Body-relative dot-notation paths ignored by the AzAPI provider. Ignored configur
 - `network_private_endpoints_private_dns_zone_groups` - Paths ignored on the private DNS zone group.
 DESCRIPTION
   nullable    = false
+}
+
+variable "location" {
+  type        = string
+  default     = null
+  description = "The Azure region for this module's resources or telemetry deployment."
+
+  validation {
+    condition     = !var.enable_telemetry || var.location != null
+    error_message = "The location must not be null when telemetry is enabled."
+  }
 }
 
 variable "resource_types" {

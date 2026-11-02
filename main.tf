@@ -91,12 +91,12 @@ module "private_dns_zone_group" {
   source = "./modules/private-dns-zone-group"
   count  = length(var.private_dns_zone_resource_ids) > 0 ? 1 : 0
 
-  location                      = var.location
   name                          = local.private_dns_zone_group_name
   parent_id                     = azapi_resource.this.id
   private_dns_zone_resource_ids = var.private_dns_zone_resource_ids
   enable_telemetry              = var.enable_telemetry
   ignore_body_changes           = var.ignore_body_changes.network_private_endpoints_private_dns_zone_groups
+  location                      = var.location
   resource_types                = var.resource_types.network_private_endpoints_private_dns_zone_groups
   retry                         = var.retry
   timeouts                      = var.timeouts
