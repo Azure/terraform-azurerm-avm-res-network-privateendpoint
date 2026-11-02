@@ -51,7 +51,7 @@ resource "random_integer" "region_index" {
 # This ensures we have unique CAF compliant names for our resources.
 module "naming" {
   source  = "Azure/avm-utl-naming/azure"
-  version = "0.2.0"
+  version = "0.3.0"
 
   legacy_mode = true
 }
@@ -67,7 +67,7 @@ module "resource_group" {
 
 module "key_vault" {
   source  = "Azure/avm-res-keyvault-vault/azurerm"
-  version = "0.11.0"
+  version = "0.12.0"
 
   location            = module.resource_group.location
   name                = module.naming.key_vault.name_unique
@@ -78,7 +78,7 @@ module "key_vault" {
 
 module "virtual_network" {
   source  = "Azure/avm-res-network-virtualnetwork/azurerm"
-  version = "0.22.2"
+  version = "0.22.3"
 
   location         = module.resource_group.location
   parent_id        = module.resource_group.resource_id
