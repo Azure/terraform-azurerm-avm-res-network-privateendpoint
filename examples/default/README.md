@@ -4,26 +4,14 @@
 
 This deploys the module in its simplest form.
 
-The naming utility uses `legacy_mode = true` to preserve the original example's naming conventions when upgrading from `Azure/naming/azurerm`.
-
 ```hcl
 terraform {
   required_version = ">= 1.16, < 2.0"
 
   required_providers {
-    # tflint-ignore: terraform_unused_required_providers
     azapi = {
       source  = "Azure/azapi"
       version = "~> 2.12"
-    }
-    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = ">= 3.7.0, < 5.0.0"
-    }
-    # tflint-ignore: terraform_unused_required_providers
-    modtm = {
-      source  = "registry.terraform.io/azure/modtm"
-      version = "~> 0.3"
     }
     random = {
       source  = "hashicorp/random"
@@ -32,93 +20,103 @@ terraform {
   }
 }
 
-provider "azurerm" {
-  features {
-    resource_group {
-      prevent_deletion_if_contains_resources = false
-    }
-  }
-}
+provider "azapi" {}
 
-data "azurerm_client_config" "current" {}
+data "azapi_client_config" "current" {}
 
-## Section to provide a random Azure region for the resource group
-# This allows us to randomize the region for the resource group.
 module "regions" {
-  source  = "Azure/regions/azurerm"
-  version = "0.8.2"
+  source  = "Azure/avm-utl-regions/azurerm"
+  version = "0.13.2"
+
+  location         = "eastus2"
+  enable_telemetry = var.enable_telemetry
 }
 
-# This allows us to randomize the region for the resource group.
 resource "random_integer" "region_index" {
   max = length(module.regions.regions) - 1
   min = 0
 }
 
-## End of section to provide a random Azure region for the resource group
-
-# This ensures we have unique CAF compliant names for our resources.
 module "naming" {
   source  = "Azure/avm-utl-naming/azure"
   version = "0.2.0"
 
-  legacy_mode = true
+  unique_length = 8
 }
 
-module "resource_group" {
-  source  = "Azure/avm-res-resources-resourcegroup/azurerm"
-  version = "0.4.0"
-
-  location         = module.regions.regions[random_integer.region_index.result].name
-  name             = module.naming.resource_group.name_unique
-  enable_telemetry = var.enable_telemetry
+resource "azapi_resource" "resource_group" {
+  location               = module.regions.regions[random_integer.region_index.result].name
+  name                   = module.naming.names.resource_group.name_unique
+  parent_id              = data.azapi_client_config.current.subscription_resource_id
+  type                   = "Microsoft.Resources/resourceGroups@2024-07-01"
+  body                   = {}
+  response_export_values = []
 }
 
-module "key_vault" {
-  source  = "Azure/avm-res-keyvault-vault/azurerm"
-  version = "0.11.0"
-
-  location            = module.resource_group.location
-  name                = module.naming.key_vault.name_unique
-  resource_group_name = module.resource_group.name
-  tenant_id           = data.azurerm_client_config.current.tenant_id
-  enable_telemetry    = var.enable_telemetry
-}
-
-module "virtual_network" {
-  source  = "Azure/avm-res-network-virtualnetwork/azurerm"
-  version = "0.22.2"
-
-  location         = module.resource_group.location
-  parent_id        = module.resource_group.resource_id
-  address_space    = ["10.0.0.0/16"]
-  enable_telemetry = var.enable_telemetry
-  name             = module.naming.virtual_network.name_unique
-  subnets = {
-    default = {
-      address_prefixes = ["10.0.1.0/24"]
-      name             = module.naming.subnet.name_unique
+resource "azapi_resource" "key_vault" {
+  location  = azapi_resource.resource_group.location
+  name      = module.naming.names.key_vault_vault.name_unique
+  parent_id = azapi_resource.resource_group.id
+  type      = "Microsoft.KeyVault/vaults@2023-07-01"
+  body = {
+    properties = {
+      accessPolicies          = []
+      enablePurgeProtection   = true
+      enableRbacAuthorization = true
+      networkAcls = {
+        bypass        = "None"
+        defaultAction = "Deny"
+      }
+      publicNetworkAccess = "Enabled"
+      sku = {
+        family = "A"
+        name   = "premium"
+      }
+      tenantId = data.azapi_client_config.current.tenant_id
     }
   }
+  response_export_values = []
 }
 
-# This is the module call
-# Do not specify location here due to the randomization above.
-# Leaving location as `null` will cause the module to use the resource group location
-# with a data source.
+resource "azapi_resource" "virtual_network" {
+  location  = azapi_resource.resource_group.location
+  name      = module.naming.names.virtual_network.name_unique
+  parent_id = azapi_resource.resource_group.id
+  type      = "Microsoft.Network/virtualNetworks@2024-05-01"
+  body = {
+    properties = {
+      addressSpace = {
+        addressPrefixes = ["10.0.0.0/16"]
+      }
+    }
+  }
+  response_export_values = []
+}
+
+resource "azapi_resource" "subnet" {
+  name      = module.naming.names.virtual_network_subnet.name_unique
+  parent_id = azapi_resource.virtual_network.id
+  type      = "Microsoft.Network/virtualNetworks/subnets@2024-05-01"
+  body = {
+    properties = {
+      addressPrefix                  = "10.0.1.0/24"
+      privateEndpointNetworkPolicies = "Enabled"
+    }
+  }
+  response_export_values = []
+}
+
 module "test" {
   source = "../../"
 
-  location                       = module.resource_group.location
-  name                           = module.naming.private_endpoint.name_unique
-  network_interface_name         = module.naming.network_interface.name_unique
-  parent_id                      = module.resource_group.resource_id
-  private_connection_resource_id = module.key_vault.resource_id
-  subnet_resource_id             = module.virtual_network.subnets["default"].resource_id
-  # source             = "terraform-azurerm-avm-res-network-privateendpoint/azurerm"
-  # ...
-  enable_telemetry  = var.enable_telemetry # see variables.tf
-  subresource_names = ["vault"]
+  location                       = azapi_resource.resource_group.location
+  name                           = module.naming.names.private_endpoint.name_unique
+  network_interface_name         = module.naming.names.network_interface.name_unique
+  parent_id                      = azapi_resource.resource_group.id
+  private_connection_resource_id = azapi_resource.key_vault.id
+  subnet_resource_id             = azapi_resource.subnet.id
+  enable_telemetry               = var.enable_telemetry
+  subresource_names              = ["vault"]
 }
 ```
 
@@ -131,18 +129,18 @@ The following requirements are needed by this module:
 
 - <a name="requirement_azapi"></a> [azapi](#requirement\_azapi) (~> 2.12)
 
-- <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) (>= 3.7.0, < 5.0.0)
-
-- <a name="requirement_modtm"></a> [modtm](#requirement\_modtm) (~> 0.3)
-
 - <a name="requirement_random"></a> [random](#requirement\_random) (>= 3.5.0, < 4.0.0)
 
 ## Resources
 
 The following resources are used by this module:
 
+- [azapi_resource.key_vault](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
+- [azapi_resource.resource_group](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
+- [azapi_resource.subnet](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
+- [azapi_resource.virtual_network](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
 - [random_integer.region_index](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/integer) (resource)
-- [azurerm_client_config.current](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/client_config) (data source)
+- [azapi_client_config.current](https://registry.terraform.io/providers/Azure/azapi/latest/docs/data-sources/client_config) (data source)
 
 <!-- markdownlint-disable MD013 -->
 ## Required Inputs
@@ -171,12 +169,6 @@ No outputs.
 
 The following Modules are called:
 
-### <a name="module_key_vault"></a> [key\_vault](#module\_key\_vault)
-
-Source: Azure/avm-res-keyvault-vault/azurerm
-
-Version: 0.11.0
-
 ### <a name="module_naming"></a> [naming](#module\_naming)
 
 Source: Azure/avm-utl-naming/azure
@@ -185,27 +177,15 @@ Version: 0.2.0
 
 ### <a name="module_regions"></a> [regions](#module\_regions)
 
-Source: Azure/regions/azurerm
+Source: Azure/avm-utl-regions/azurerm
 
-Version: 0.8.2
-
-### <a name="module_resource_group"></a> [resource\_group](#module\_resource\_group)
-
-Source: Azure/avm-res-resources-resourcegroup/azurerm
-
-Version: 0.4.0
+Version: 0.13.2
 
 ### <a name="module_test"></a> [test](#module\_test)
 
 Source: ../../
 
 Version:
-
-### <a name="module_virtual_network"></a> [virtual\_network](#module\_virtual\_network)
-
-Source: Azure/avm-res-network-virtualnetwork/azurerm
-
-Version: 0.22.2
 
 <!-- markdownlint-disable-next-line MD041 -->
 ## Data Collection
