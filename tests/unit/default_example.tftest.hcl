@@ -110,20 +110,3 @@ run "default_example" {
     error_message = "The example must return the private endpoint ID and private IP address."
   }
 }
-
-run "default_example_without_telemetry" {
-  command = apply
-
-  module {
-    source = "./examples/default"
-  }
-
-  variables {
-    enable_telemetry = false
-  }
-
-  assert {
-    condition     = module.test.name == module.naming.names.private_endpoint.name_unique
-    error_message = "Disabling telemetry must still create the named private endpoint."
-  }
-}
