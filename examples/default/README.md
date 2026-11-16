@@ -39,7 +39,7 @@ resource "random_integer" "region_index" {
 
 module "naming" {
   source  = "Azure/avm-utl-naming/azure"
-  version = "0.2.0"
+  version = "0.3.0"
 
   unique_length = 8
 }
@@ -173,7 +173,7 @@ The following Modules are called:
 
 Source: Azure/avm-utl-naming/azure
 
-Version: 0.2.0
+Version: 0.3.0
 
 ### <a name="module_regions"></a> [regions](#module\_regions)
 
