@@ -75,7 +75,7 @@ run "default_example" {
   command = apply
 
   module {
-    source = "./examples/default"
+    source = "./examples/defaults"
   }
 
   assert {
