@@ -19,7 +19,7 @@ data "azapi_client_config" "current" {}
 
 module "regions" {
   source  = "Azure/avm-utl-regions/azurerm"
-  version = "0.13.2"
+  version = "0.15.0"
 
   location         = "eastus2"
   enable_telemetry = var.enable_telemetry
@@ -32,7 +32,7 @@ resource "random_integer" "region_index" {
 
 module "naming" {
   source  = "Azure/avm-utl-naming/azure"
-  version = "0.2.0"
+  version = "0.3.0"
 
   unique_length = 8
 }
